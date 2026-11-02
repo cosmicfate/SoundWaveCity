@@ -61,28 +61,54 @@ public class TrackManager {
     CombineTracks();
     pseudoCombinedTrack.Play();
   }
+  //private void CombineTracks() {
+  //  pseudoCombinedTrack?.Dispose();
+  //  List<float> combinedSamples = new();
+  //  foreach (Track track in Tracks) {
+  //    if (track.IsDisabled) {
+  //      continue;
+  //    }
+  //    float[] trackSamples = (float[])track.GetAdjustedSamples().Clone();
+  //    for (int i = 0; i < trackSamples.Length; i++) {
+  //      if (combinedSamples.Count <= i) {
+  //        combinedSamples.Add(0);
+  //      }
+  //      combinedSamples[i] += trackSamples[i];
+  //    }
+  //  }
+  //  pseudoCombinedTrack = new(combinedSamples.ToArray());
+  //  pseudoCombinedTrack.LinkPanels(null, panContainer);
+  //}
+
   private void CombineTracks() {
-    pseudoCombinedTrack?.Dispose();
-    List<float> combinedSamples = new();
-    foreach (Track track in Tracks) {
-      if (track.IsDisabled) {
-        continue;
-      }
-      float[] trackSamples = (float[])track.GetAdjustedSamples().Clone();
-      for (int i = 0; i < trackSamples.Length; i++) {
-        if (combinedSamples.Count <= i) {
-          combinedSamples.Add(0);
-        }
-        combinedSamples[i] += trackSamples[i];
-      }
+  pseudoCombinedTrack?.Dispose();
+  List<float> combinedSamples = new();
+  foreach (Track track in Tracks) {
+    if (track.IsDisabled) {
+      continue;
     }
-    pseudoCombinedTrack = new(combinedSamples.ToArray());
-    pseudoCombinedTrack.LinkPanels(null, panContainer);
+    float[] trackSamples = (float[])track.GetAdjustedSamples().Clone();
+    for (int i = 0; i < trackSamples.Length; i++) {
+      if (combinedSamples.Count <= i) {
+        combinedSamples.Add(0);
+      }
+      combinedSamples[i] += trackSamples[i];
+    }
   }
+  pseudoCombinedTrack = new(combinedSamples.ToArray());
+  pseudoCombinedTrack.LinkPanels(null, panContainer);
+  pseudoCombinedTrack.SetDrawTimescale(DrawTimescale); // Ensure combined track knows timescale ratio
+}
+
   public void PauseAll() {
     pseudoCombinedTrack?.Pause();
   }
   public int GetPlayheadPos() {
-    return (pseudoCombinedTrack?.GetPlayheadPos() ?? 0) / DrawTimescale;
-  }
+    return (pseudoCombinedTrack?.GetPlayheadPos() ?? 0) / Math.Max(1, DrawTimescale);
+   }
+
+  public void PlayAllFrom(int xPos) {
+    CombineTracks();
+    pseudoCombinedTrack?.PlayFromPosition(xPos);
+   }
 }

@@ -11,6 +11,7 @@ public partial class FrmMain : Form {
   public FrmMain() {
     InitializeComponent();
     Setup();
+    SizeChanged += FrmMain_SizeChanged;
   }
 
   // setup
@@ -21,7 +22,8 @@ public partial class FrmMain : Form {
     trackManager.DrawTimescale = trkDrawTimescale.Value;
     UpdateSizes();
     ApplySettings();
-  }
+    SetupScrubber(); // Initialize the scrubber
+    }
   private void ApplySettings() {
     BackColor = Settings.Color.WinBg;
     panTracks.BackColor = Settings.Color.TrackBg_Unselected;
@@ -62,16 +64,27 @@ public partial class FrmMain : Form {
     UpdateSizes();
   }
 
-  private void btnPlay_Click(object sender, EventArgs e) {
-    if (trackManager.State is NAudio.Wave.PlaybackState.Stopped or NAudio.Wave.PlaybackState.Paused) {
-      trackManager.PlayAll();
-      btnPlay.BackgroundImage = Resources.pause;
+  //private void btnPlay_Click(object sender, EventArgs e) {
+  //  if (trackManager.State is NAudio.Wave.PlaybackState.Stopped or NAudio.Wave.PlaybackState.Paused) {
+  //    trackManager.PlayAll();
+  //    btnPlay.BackgroundImage = Resources.pause;
+  //  }
+  //  else {
+  //    trackManager.PauseAll();
+  //    btnPlay.BackgroundImage = Resources.play;
+  //  }
+  //}
+
+    private void btnPlay_Click(object sender, EventArgs e) {
+      if (trackManager.State is NAudio.Wave.PlaybackState.Stopped or NAudio.Wave.PlaybackState.Paused) {
+        trackManager.PlayAllFrom(trkScrubber?.Value ?? 0);
+        btnPlay.BackgroundImage = Resources.pause;
+      }
+      else {
+        trackManager.PauseAll();
+        btnPlay.BackgroundImage = Resources.play;
+      }
     }
-    else {
-      trackManager.PauseAll();
-      btnPlay.BackgroundImage = Resources.play;
-    }
-  }
 
   private void menuFileOpen_Click(object sender, EventArgs e) {
     ofdLoadFile.DefaultExt = "wav";
@@ -171,21 +184,61 @@ public partial class FrmMain : Form {
     newTrack.PanDrawSamples.Invalidate();
   }
 
-  private void tmrUpdatePlaybackState_Tick(object sender, EventArgs e) {
-    if (trackManager.Tracks.Count > 0) {
-      btnPlay.BackgroundImage = trackManager.State == NAudio.Wave.PlaybackState.Playing ? Resources.pause : Resources.play;
-      btnPlay.Visible = true;
-      lblPlayhead.Left = trackManager.GetPlayheadPos();
-      lblPlayhead.Visible = true;
-    }
-    else {
-      btnPlay.BackgroundImage = null;
-      btnPlay.Visible = false;
-      lblPlayhead.Visible = false;
-    }
-  }
+    //private void tmrUpdatePlaybackState_Tick(object sender, EventArgs e) {
+    //  if (trackManager.Tracks.Count > 0) {
+    //    btnPlay.BackgroundImage = trackManager.State == NAudio.Wave.PlaybackState.Playing ? Resources.pause : Resources.play;
+    //    btnPlay.Visible = true;
+    //    lblPlayhead.Left = trackManager.GetPlayheadPos();
+    //    lblPlayhead.Visible = true;
+    //  }
+    //  else {
+    //    btnPlay.BackgroundImage = null;
+    //    btnPlay.Visible = false;
+    //    lblPlayhead.Visible = false;
+    //  }
+    //}
 
-  private void trkDrawTimescale_Scroll(object sender, EventArgs e) {
+    private void tmrUpdatePlaybackState_Tick(object sender, EventArgs e)
+    {
+        if (trackManager.Tracks.Count > 0)
+        {
+            bool isPlaying = trackManager.State == NAudio.Wave.PlaybackState.Playing;
+            btnPlay.BackgroundImage = isPlaying ? Resources.pause : Resources.play;
+            btnPlay.Visible = true;
+
+            if (!isScrubbing)
+            {
+                if (isPlaying)
+                {
+                    int pos = trackManager.GetPlayheadPos();
+                    lblPlayhead.Left = pos;
+                    if (trkScrubber != null && pos >= trkScrubber.Minimum && pos <= trkScrubber.Maximum)
+                    {
+                        trkScrubber.Value = pos;
+                    }
+                }
+                else
+                {
+                    // While stopped, preserve the user's scrubbed location
+                    lblPlayhead.Left = scrubbedXPosition;
+                    if (trkScrubber != null && scrubbedXPosition >= trkScrubber.Minimum && scrubbedXPosition <= trkScrubber.Maximum)
+                    {
+                        trkScrubber.Value = scrubbedXPosition;
+                    }
+                }
+            }
+
+            lblPlayhead.Visible = true;
+        }
+        else
+        {
+            btnPlay.BackgroundImage = null;
+            btnPlay.Visible = false;
+            lblPlayhead.Visible = false;
+        }
+    }
+
+    private void trkDrawTimescale_Scroll(object sender, EventArgs e) {
     trackManager.DrawTimescale = trkDrawTimescale.Maximum - trkDrawTimescale.Value;
     trackManager.RedrawAll();
   }
@@ -221,6 +274,12 @@ public partial class FrmMain : Form {
     panTracks.Left = PADDING;
     panTracks.Width = ClientSize.Width - (PADDING * 2);
 
+    if (trkScrubber != null) {
+        trkScrubber.Left = panTracks.Left;
+        trkScrubber.Width = panTracks.Width;
+        trkScrubber.Maximum = panTracks.Width;
+    }
+
     int top = 0;
     foreach (Track track in trackManager.Tracks) {
       track.PanDrawSamples.Left = 0;
@@ -236,4 +295,53 @@ public partial class FrmMain : Form {
     lblPlayhead.Height = panTracks.Height;
     lblPlayhead.BringToFront();
   }
+
+    // --- ADDITIVE EXTENSIONS FOR SCRUBBING ---
+
+    private TrackBar trkScrubber;
+    private bool isScrubbing = false;
+    private int scrubbedXPosition = 0;
+
+    private void SetupScrubber()
+    {
+        trkScrubber = new TrackBar
+        {
+            Left = panTracks.Left,
+            Top = Math.Max(0, panTracks.Top - 28),
+            Width = panTracks.Width,
+            Minimum = 0,
+            Maximum = panTracks.Width,
+            TickStyle = TickStyle.None,
+            Height = 25
+        };
+
+        trkScrubber.MouseDown += trkScrubber_MouseDown;
+        trkScrubber.Scroll += trkScrubber_Scroll;
+        trkScrubber.MouseUp += trkScrubber_MouseUp;
+
+        Controls.Add(trkScrubber);
+        trkScrubber.BringToFront();
+    }
+
+    private void trkScrubber_MouseDown(object sender, MouseEventArgs e)
+    {
+        isScrubbing = true;
+    }
+
+    private void trkScrubber_Scroll(object sender, EventArgs e)
+    {
+        scrubbedXPosition = trkScrubber.Value;
+        lblPlayhead.Left = scrubbedXPosition;
+    }
+
+    private void trkScrubber_MouseUp(object sender, MouseEventArgs e)
+    {
+        isScrubbing = false;
+        scrubbedXPosition = trkScrubber.Value;
+
+        if (trackManager.State == NAudio.Wave.PlaybackState.Playing)
+        {
+            trackManager.PlayAllFrom(scrubbedXPosition);
+        }
+    }
 }
