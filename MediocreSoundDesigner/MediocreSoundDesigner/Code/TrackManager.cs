@@ -97,7 +97,7 @@ public class TrackManager {
   }
   pseudoCombinedTrack = new(combinedSamples.ToArray());
   pseudoCombinedTrack.LinkPanels(null, panContainer);
-  pseudoCombinedTrack.SetDrawTimescale(DrawTimescale); // Ensure combined track knows timescale ratio
+  pseudoCombinedTrack.SetDrawTimescale(DrawTimescale);
 }
 
   public void PauseAll() {
