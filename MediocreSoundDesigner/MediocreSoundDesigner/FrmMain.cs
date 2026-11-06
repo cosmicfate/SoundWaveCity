@@ -219,7 +219,6 @@ public partial class FrmMain : Form {
                 }
                 else
                 {
-                    // While stopped, preserve the user's scrubbed location
                     lblPlayhead.Left = scrubbedXPosition;
                     if (trkScrubber != null && scrubbedXPosition >= trkScrubber.Minimum && scrubbedXPosition <= trkScrubber.Maximum)
                     {
@@ -295,8 +294,6 @@ public partial class FrmMain : Form {
     lblPlayhead.Height = panTracks.Height;
     lblPlayhead.BringToFront();
   }
-
-    // --- ADDITIVE EXTENSIONS FOR SCRUBBING ---
 
     private TrackBar trkScrubber;
     private bool isScrubbing = false;

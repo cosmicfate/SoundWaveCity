@@ -338,9 +338,8 @@ public class Track : IDisposable
         SaveToTempFile();
         fileReader = new AudioFileReader(tempFilePath);
 
-        // Convert scrubbed pixel position directly into sample byte offset (4 bytes per 32-bit float sample)
         long targetByte = (long)xPos * drawTimescale * 4;
-        targetByte -= targetByte % 4; // Align to 4-byte sample boundary
+        targetByte -= targetByte % 4;
         fileReader.Position = Math.Clamp(targetByte, 0, fileReader.Length);
 
         outputDevice = new WaveOut();
