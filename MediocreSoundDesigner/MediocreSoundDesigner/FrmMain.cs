@@ -131,7 +131,22 @@ public partial class FrmMain : Form {
     }
   }
 
-  private void menuGenRecord_Click(object sender, EventArgs e) {
+  private void menuEditSplit_Click(object sender, EventArgs e) {
+    // Split works on the selected track, like every other Edit menu command.
+    Track track = trackManager.SelectedTrack;
+    if (track is null) return;
+
+     // Split the clip under the edit cursor (a pixel X position). Both halves
+     // stay on this track, so there are no new panels or rows and UpdateSizes
+     // isn't needed. SplitAt returns false if the cursor isn't inside a clip.
+     if (track.SplitAt(scrubbedXPosition))
+     {
+         // Repaint so the new clip edge and the selection outline appear.
+         track.PanDrawSamples.Invalidate();
+     }
+  }
+
+    private void menuGenRecord_Click(object sender, EventArgs e) {
     Track newTrack = new(new float[0]);
     CreateTrackPanel(newTrack);
     trackManager.AddTrack(newTrack);
@@ -252,6 +267,26 @@ public partial class FrmMain : Form {
     };
     pan.Click += (sender, e) => {
       trackManager.SelectTrack(track);
+    };
+    pan.MouseClick += (sender, e) =>
+    {
+        // MouseClick reports the mouse position
+        // clicking a track does two more things:
+        //      1. moves the timeline head to the clicked position
+        //      2. selects the clip under the mouse, if there is one
+
+        // track panels sit at Left = 0 inside panTracks. the scrubber's range is 0..panTracks.Width
+        // Math.Clamp allegedly keeps the value inside the range that TrackBar accepts
+        scrubbedXPosition = Math.Clamp(e.X, trkScrubber.Minimum, trkScrubber.Maximum);
+
+        // moves scrubber thumb and playhead line to the clicked point
+        // as a plus this also sets where playback starts (W rizz)
+        trkScrubber.Value = scrubbedXPosition;
+        lblPlayhead.Left = scrubbedXPosition;
+
+        // selects the clicked clip and then repaints the outline
+        track.SelectClipAt(e.X);
+        track.PanDrawSamples.Invalidate();
     };
     pan.DoubleClick += (sender, e) => {
       track.ToggleDisabled();
