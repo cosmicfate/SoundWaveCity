@@ -1,4 +1,6 @@
-﻿using NAudio.Wave;
+﻿using MediocreSoundDesigner.Code;
+using NAudio.Wave;
+using System.Drawing.Drawing2D;
 
 namespace MediocreSoundDesigner;
 
@@ -17,7 +19,23 @@ public class Track : IDisposable
     private float offset;
     private float timeScale;
     private int sampleRate;
-    private float[] samples;
+
+    // All clips on the track, kept in order by StartSample, list object created only once.
+    private readonly List<Clip> clips = new();
+
+    // Read-only view of the clips. Callers can look at clips but can't add or remove without going through Track.cs methods.
+    public IReadOnlyList<Clip> Clips => clips;
+
+    // The clip that is "selected" and allows for edits to act on.
+    public Clip SelectedClip { get; private set; }
+
+    // Compatability change to support the addition of clips. Samples used to be the track's only audio array
+    // this now redirects to the selected clip's array so now every edit is only on the selected clip.
+    private float[] samples
+    {
+        get => SelectedClip.Samples;
+        set => SelectedClip.Samples = value;
+    }
     private float pitch;
     private int bits;
     private int channels;
@@ -29,7 +47,9 @@ public class Track : IDisposable
     private int startXPosition = 0;
 
     // properties
-    public int DrawOffset { get; set; }
+
+    // DrawOffset() removed because each Clip now stores its own position (Clip.StartSample). -G
+    //public int DrawOffset { get; set; } 
     public bool IsDisabled { get; private set; }
     public Panel PanDrawSamples { get; private set; }
     public float Volume { get; private set; }
@@ -41,13 +61,16 @@ public class Track : IDisposable
     {
         fileReader = new AudioFileReader(file);
         int sampleCount = (int)(fileReader.Length / 4);
-        this.samples = new float[sampleCount];
-        int samplesRead = ((ISampleProvider)fileReader).Read(samples);
+        // samples is read into local array now because now 'samples' needs a SelectedClip that doesn't exist yet
+        float[] fileSamples = new float[sampleCount];
+        int samplesRead = ((ISampleProvider)fileReader).Read(fileSamples);
         if (samplesRead < sampleCount)
         {
-            Array.Resize(ref samples, samplesRead);
+            Array.Resize(ref fileSamples, samplesRead);
         }
-
+        // whole file becomes one clip that starts at pos 0 and is selected
+        clips.Add(new Clip(fileSamples, 0));
+        SelectedClip = clips[0];
         this.file = file;
         this.duration = fileReader.TotalTime;
         this.offset = 0;
@@ -61,7 +84,8 @@ public class Track : IDisposable
     }
     public Track(float[] samples)
     {
-        this.samples = samples;
+        clips.Add(new Clip(samples, 0));
+        SelectedClip = clips[0];
 
         this.file = "";
         this.duration = TimeSpan.Zero;
@@ -186,6 +210,58 @@ public class Track : IDisposable
         samples = newSamples;
     }
 
+    // converts an X position on the track panel into a sample index
+    private int TimelineSampleAt(int panelX) =>
+        panelX * Math.Max(1, drawTimescale);
+
+    // returns clip within the given panel X position, or null if between clips, before the first, or after the last.
+    public Clip ClipAt(int panelX)
+    {
+        int t = TimelineSampleAt(panelX);
+        // List.Find returns the first clip whose Contains(t) is True or null
+        return clips.Find(c => c.Contains(t));
+    }
+
+    // selects clip under the given panel X position. returns False and maintains current selection if no clip is present at that position.
+    public bool SelectClipAt(int panelX)
+    {
+        Clip clip = ClipAt(panelX);
+        if (clip is null) return false;
+        SelectedClip = clip;
+        return true;
+    }
+
+    // Split: splits the clip at the panel X position into two separate clips on the track.
+    // returns false if nothing is split either because the point is not inside a clip or if 
+    // the point is at the clip's very first sample
+    public bool SplitAt(int panelX)
+    {
+        // find which clip the point is at
+        int t = TimelineSampleAt(panelX);
+        Clip clip = clips.Find(c => c.Contains(t));
+        if (clip is null) return false;
+
+        // make position relative to the start of the clip; gives index into clip.Samples
+        int index = t - clip.StartSample;
+        index -= index % Math.Max(1, channels);
+
+        // prevents index from being at the very start or past the end
+        if (index <= 0 || index >= clip.Samples.Length) return false;
+
+        // the second half of a split clip starts exactly where the first half ends.
+        Clip right = new(clip.Samples[index..], clip.StartSample + index);  // [index..] copies everything from index to the end.
+
+        // the original (left half) of the clip gets shortened to the index.
+        clip.Samples = clip.Samples[..index];
+
+        // insert the right half directly after the left half
+        clips.Insert(clips.IndexOf(clip) + 1, right);
+
+        // for convenience to the user, the right half gets selected for easy movement/edit (right arrow)
+        SelectedClip = right;
+        return true;
+    }
+
     // play
     public void Play()
     {
@@ -225,35 +301,45 @@ public class Track : IDisposable
     {
         Directory.CreateDirectory(Path.GetDirectoryName(tempFilePath));
         using var writer = new WaveFileWriter(tempFilePath, fileReader?.WaveFormat ?? new());
-        writer.WriteSamples(GetAdjustedSamples(), 0, samples.Length);
+        // since 'samples' now only references the selectedClip, using output's length writes everything
+        float[] output = GetAdjustedSamples();
+        writer.WriteSamples(output, 0, output.Length);
     }
     public void SaveToFile(string path)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path));
         using var writer = new WaveFileWriter(path, fileReader?.WaveFormat ?? new());
-        writer.WriteSamples(GetAdjustedSamples(), 0, samples.Length);
+        // since 'samples' now only references the selectedClip, using output's length writes everything
+        float[] output = GetAdjustedSamples();
+        writer.WriteSamples(output, 0, output.Length);
     }
     public float[] GetAdjustedSamples()
     {
-        float[] adjSamples = new float[samples.Length];
-        for (int s = 0; s < samples.Length; s++)
-        {
-            adjSamples[s] = samples[s] * Volume;
-        }
-        float[] deadSpace = new float[DrawOffset * drawTimescale];
-        for (int i = 0; i < DrawOffset; i++)
-        {
-            deadSpace[i] = 0.0f;
-        }
+        int length = clips.Max(c => c.EndSample);
+        float[] adjusted = new float[length];
 
-        return [.. deadSpace, .. adjSamples];
+        foreach (Clip clip in clips)
+        {
+            for (int s = 0; s < clip.Samples.Length; s++)
+            {
+                // copies each sample to its timeline position, scaled by track's volume
+                adjusted[clip.StartSample + s] += clip.Samples[s] * Volume;
+            }
+        }
+        return adjusted;
     }
 
     // render
     public void ShiftSampleOver(int amount)
     {
-        DrawOffset += amount;
-        DrawOffset = Math.Max(0, DrawOffset);
+        int delta = amount * Math.Max(1, drawTimescale);
+        delta -= delta % Math.Max(1, channels);
+        int i = clips.IndexOf(SelectedClip);
+        int min = i > 0 ? clips[i - 1].EndSample : 0;
+        int max = i < clips.Count - 1
+            ? clips[i + 1].StartSample - SelectedClip.Samples.Length
+            : int.MaxValue;
+        SelectedClip.StartSample = Math.Clamp(SelectedClip.StartSample + delta, min, max);
     }
     public void DrawSamples(Graphics g, int drawTimescale)
     {
@@ -263,21 +349,45 @@ public class Track : IDisposable
         }
 
         this.drawTimescale = drawTimescale;
-        float heightAdj = PanDrawSamples.Height / 2;
-        if (samples != null && samples.Length > 0)
+        int ts = Math.Max(1, drawTimescale);
+
+        int height = PanDrawSamples.Height;
+        int middle = height / 2;            
+        float heightAdj = height / 2;       
+
+        using Pen samplePen = new(IsDisabled ? Settings.Color.TrackSamples_Disabled : Settings.Color.TrackSamples_Enabled);
+        using Pen edgePen = new(Settings.Color.WinBg);
+        using Pen selectedPen = new(Settings.Color.TrackSamples_Disabled) { DashStyle = DashStyle.Dash };
+
+        foreach (Clip clip in clips)
         {
-            int x = DrawOffset;
-            Pen pen = new(IsDisabled ? Settings.Color.TrackSamples_Disabled : Settings.Color.TrackSamples_Enabled);
-            List<Point> points = new();
-            for (int s = 0; s < samples.Length; s += drawTimescale)
+            int startX = clip.StartSample / ts;
+            int endX = clip.EndSample / ts;
+
+            if (clip.Samples.Length > 0)
             {
-                var sample = (int)(samples[s] * heightAdj * Volume);
-                points.Add(new(x, PanDrawSamples.Height / 2));
-                points.Add(new(x, PanDrawSamples.Height / 2 - sample));
-                x++;
+                List<Point> points = new();
+                int x = startX;
+                for (int s = 0; s < clip.Samples.Length; s += ts)
+                {
+                    var sample = (int)(clip.Samples[s] * heightAdj * Volume);
+                    points.Add(new(x, middle));         
+                    points.Add(new(x, middle - sample)); 
+                    x++;
+                }
+                g.DrawLines(samplePen, points.ToArray());
             }
-            g.DrawLines(pen, points.ToArray());
-            pen.Dispose();
+
+            if (clips.Count > 1)
+            {
+                g.DrawLine(edgePen, startX, 0, startX, height);
+                g.DrawLine(edgePen, endX, 0, endX, height);
+
+                if (clip == SelectedClip)
+                {
+                    g.DrawRectangle(selectedPen, startX, 0, endX - startX, height - 1);
+                }
+            }
         }
     }
 
