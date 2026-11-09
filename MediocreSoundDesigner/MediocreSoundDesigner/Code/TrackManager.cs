@@ -24,7 +24,12 @@ public class TrackManager {
 
 	public void RemTrack(Track track) {
 		Tracks.Remove(track);
-	}
+        // if removed track was selected, deselect to avoid a reference to it
+        if (SelectedTrack == track)
+        {
+            SelectedTrack = null;
+        }
+    }
 
 	public void SelectTrack(Track track) {
 		SelectedTrack = track;

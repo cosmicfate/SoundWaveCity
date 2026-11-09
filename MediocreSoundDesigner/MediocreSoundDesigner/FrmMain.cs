@@ -31,34 +31,49 @@ public partial class FrmMain : Form {
     trackManager.ApplySettings();
   }
 
-  // GUI controls
-  protected override bool ProcessCmdKey(ref Message msg, Keys keyData) {
-    if (trackManager.SelectedTrack is not null) {
-      if (keyData == Keys.Left) {
-        trackManager.SelectedTrack.ShiftSampleOver(-5);
-        trackManager.SelectedTrack.PanDrawSamples.Invalidate();
-        return true;
-      }
-      else if (keyData == Keys.Right) {
-        trackManager.SelectedTrack.ShiftSampleOver(+5);
-        trackManager.SelectedTrack.PanDrawSamples.Invalidate();
-        return true;
-      }
-      else if (keyData == Keys.Delete) {
-        if (trackManager.SelectedTrack is not null) {
-          if (MessageBox.Show("This will delete the selected track. This is NOT undoable!", "Are You Sure?", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Exclamation) == DialogResult.Yes) {
-            panTracks.Controls.Remove(trackManager.SelectedTrack.PanDrawSamples);
-            trackManager.SelectedTrack.PanDrawSamples.Dispose();
-            trackManager.SelectedTrack.Dispose();
-            trackManager.RemTrack(trackManager.SelectedTrack);
-            UpdateSizes();
-            return true;
-          }
+    // GUI controls
+    protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+    {
+        Track selectedTrack = trackManager.SelectedTrack;
+        if (selectedTrack is not null)
+        {
+            if (keyData == Keys.Left)
+            {
+                selectedTrack.ShiftSampleOver(-5);
+                selectedTrack.PanDrawSamples.Invalidate();
+                return true;
+            }
+            else if (keyData == Keys.Right)
+            {
+                selectedTrack.ShiftSampleOver(+5);
+                selectedTrack.PanDrawSamples.Invalidate();
+                return true;
+            }
+            else if (keyData == Keys.Delete)
+            {
+                if (selectedTrack.SelectedClip is not null & selectedTrack.Clips.Count != 1)
+                {
+                    if (MessageBox.Show("This will delete the selected clip. This is NOT undoable!", "Are You Sure?", MessageBoxButtons.YesNo, MessageBoxIcon.Exclamation) == DialogResult.Yes)
+                    {
+                        selectedTrack.RemoveSelectedClip();
+                        selectedTrack.PanDrawSamples.Invalidate();
+                    }
+                }
+                else
+                {
+                    if (MessageBox.Show("This will delete the selected track. This is NOT undoable!", "Are You Sure?", MessageBoxButtons.YesNo, MessageBoxIcon.Exclamation) == DialogResult.Yes)
+                    {
+                        trackManager.RemTrack(selectedTrack);
+                        panTracks.Controls.Remove(selectedTrack.PanDrawSamples);
+                        selectedTrack.Dispose();
+                        UpdateSizes();
+                    }
+                }
+                return true;
+            }
         }
-      }
+        return base.ProcessCmdKey(ref msg, keyData);
     }
-    return base.ProcessCmdKey(ref msg, keyData);
-  }
 
   private void FrmMain_SizeChanged(object sender, EventArgs e) {
     UpdateSizes();
@@ -124,7 +139,7 @@ public partial class FrmMain : Form {
     }
   }
   private void menuEditEliminateSilence_Click(object sender, EventArgs e) {
-    if (trackManager.SelectedTrack is not null) {
+    if (trackManager.SelectedTrack?.SelectedClip is not null) {
       FrmEditEliminateSilence frm = new();
       frm.SetSound(trackManager.SelectedTrack);
       frm.ShowDialog();

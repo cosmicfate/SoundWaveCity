@@ -27,6 +27,7 @@ public class Track : IDisposable
     public IReadOnlyList<Clip> Clips => clips;
 
     // The clip that is "selected" and allows for edits to act on.
+    // null when the user clicked an empty spot on the track (no clip selected);
     public Clip SelectedClip { get; private set; }
 
     // Compatability change to support the addition of clips. Samples used to be the track's only audio array
@@ -105,16 +106,21 @@ public class Track : IDisposable
     }
 
     // edits
+    // every edit is through samples, which now references selectedClip
+    // if a clip isn't selected, then edits do nathan
     public float[] CloneSamples()
     {
+        if (SelectedClip is null) return [];
         return (float[])samples.Clone();
     }
     public void ReplaceSamples(float[] samples)
     {
+        if (SelectedClip is null) return;
         this.samples = samples;
     }
     public void Reverse()
     {
+        if (SelectedClip is null) return;
         for (int i = 0; i < samples.Length / 2; i++)
         {
             var temp = samples[i];
@@ -124,6 +130,7 @@ public class Track : IDisposable
     }
     public void Flip()
     {
+        if (SelectedClip is null) return;
         for (int i = 0; i < samples.Length; i++)
         {
             samples[i] *= -1;
@@ -141,6 +148,7 @@ public class Track : IDisposable
     }
     public void EliminateSilence(SampleRegion region, float minDuration, float thres)
     {
+        if (SelectedClip is null) return;
         float[] newSamples = CloneSamples();
         if (region is SampleRegion.BEGINNING_ONLY or SampleRegion.BEGINNING_AND_END)
         {
@@ -222,13 +230,12 @@ public class Track : IDisposable
         return clips.Find(c => c.Contains(t));
     }
 
-    // selects clip under the given panel X position. returns False and maintains current selection if no clip is present at that position.
+    // selects clip under the given panel X position. if there is no clip then selctedClip becomes null
     public bool SelectClipAt(int panelX)
     {
-        Clip clip = ClipAt(panelX);
-        if (clip is null) return false;
-        SelectedClip = clip;
-        return true;
+        // ClipAt returns null for an empty spot, so this deselects in that case
+        SelectedClip = ClipAt(panelX);
+        return SelectedClip is not null;
     }
 
     // Split: splits the clip at the panel X position into two separate clips on the track.
@@ -284,6 +291,14 @@ public class Track : IDisposable
     //{
     //    return (int)((outputDevice?.GetPosition() ?? 0) / 4);
     //}
+    public bool RemoveSelectedClip()
+    {
+        if (SelectedClip is null) return false;
+        // if a clip is selected, remove it from the track list
+        clips.Remove(SelectedClip);
+        SelectedClip = null;
+        return true;
+    }
 
     public int GetPlayheadPos()
     {
@@ -332,6 +347,8 @@ public class Track : IDisposable
     // render
     public void ShiftSampleOver(int amount)
     {
+        // nothing to move when no clip is selected
+        if (SelectedClip is null) return;
         int delta = amount * Math.Max(1, drawTimescale);
         delta -= delta % Math.Max(1, channels);
         int i = clips.IndexOf(SelectedClip);
