@@ -2,15 +2,20 @@ namespace MediocreSoundDesigner
 {
     internal static class Program
     {
-        /// <summary>
-        ///  The main entry point for the application.
-        /// </summary>
         [STAThread]
         static void Main()
         {
-            // To customize application configuration such as set high DPI settings or default font,
-            // see https://aka.ms/applicationconfiguration.
             ApplicationConfiguration.Initialize();
+
+            OnboardingPreferences preferences = OnboardingPreferences.Load();
+            if (!preferences.Completed)
+            {
+                using var wizard = new FrmOnboarding(preferences);
+                if (wizard.ShowDialog() != DialogResult.OK)
+                    return; // Closing setup before Finish does not start the editor.
+            }
+
+            preferences.ApplyToAppColors();
             Application.Run(new FrmMain());
         }
     }
