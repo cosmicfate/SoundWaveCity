@@ -156,6 +156,12 @@ public partial class FrmMain : Form {
       frm.ShowDialog();
     }
   }
+  // split the selected clip at the current scrubber position.
+  private void menuEditSplit_Click(object sender, EventArgs e) {
+    if (trackManager.SelectedTrack is not null && trackManager.SelectedTrack.SplitAt(trkScrubber?.Value ?? 0)) {
+      trackManager.SelectedTrack.PanDrawSamples.Invalidate();
+    }
+  }
 
   // create a new track and let the user record microphone audio into it.
   private void menuGenRecord_Click(object sender, EventArgs e) {
