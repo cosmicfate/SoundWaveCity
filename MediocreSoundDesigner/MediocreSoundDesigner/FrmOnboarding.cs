@@ -5,30 +5,39 @@ using System.Windows.Forms;
 
 namespace MediocreSoundDesigner;
 
-/// <summary>First-launch onboarding; built in code so no Designer/resx is required.</summary>
+/// <summary>first-launch onboarding and reusable appearance preferences.</summary>
 public sealed class FrmOnboarding : Form
 {
+    // changes made in this window are held in memory until the user finishes.
     private readonly OnboardingPreferences prefs;
+    // shared palette values keep both setup pages visually consistent.
     private readonly Color bg = Color.FromArgb(45, 51, 57);
     private readonly Color surface = Color.FromArgb(49, 56, 64);
     private readonly Color border = Color.FromArgb(70, 77, 85);
     private readonly Color muted = Color.FromArgb(170, 180, 194);
+    // accent choices displayed as clickable circular swatches.
     private readonly Color[] accents = {
         Color.FromArgb(255, 87, 91), Color.FromArgb(247, 136, 22),
         Color.FromArgb(189, 152, 25), Color.FromArgb(36, 173, 80),
         Color.FromArgb(37, 151, 251), Color.FromArgb(148, 105, 239),
         Color.FromArgb(223, 74, 181)
     };
+    // zero is the theme page and one is the clip visualization page.
     private int step;
+    // this flag distinguishes initial setup from reopening appearance settings later.
+    private readonly bool editingAppearance;
+    // these controls are reused while switching between the two pages.
     private Panel content = null!;
     private Label progress = null!;
     private Button previous = null!;
     private Button next = null!;
 
-    public FrmOnboarding(OnboardingPreferences preferences)
+    // build the window around previously saved preferences when available.
+    public FrmOnboarding(OnboardingPreferences preferences, bool editingAppearance = false)
     {
         prefs = preferences;
-        Text = "Getting started";
+        this.editingAppearance = editingAppearance;
+        Text = editingAppearance ? "Appearance settings" : "Getting started";
         StartPosition = FormStartPosition.CenterScreen;
         ClientSize = new Size(700, 550);
         MinimumSize = new Size(700, 550);
@@ -37,13 +46,15 @@ public sealed class FrmOnboarding : Form
         BackColor = bg;
         ForeColor = Color.White;
         Font = new Font("Segoe UI", 10);
+        // create the shared header, page content region, and navigation footer.
         BuildShell();
         ShowStep();
     }
 
+    // create the parts of the wizard that remain visible on every page.
     private void BuildShell()
     {
-        var heading = new Label { Text = "Getting started", Dock = DockStyle.Top,
+        var heading = new Label { Text = editingAppearance ? "Appearance settings" : "Getting started", Dock = DockStyle.Top,
             Height = 39, Padding = new Padding(12, 9, 0, 0), ForeColor = Color.White };
         Controls.Add(heading);
 
@@ -55,13 +66,17 @@ public sealed class FrmOnboarding : Form
         next = MakeButton("Next", prefs.AccentColor, 165);
         previous.Location = new Point(345, 9);
         next.Location = new Point(519, 9);
+        // go back without discarding choices already made on the first page.
         previous.Click += (_, _) => { if (step > 0) { step--; ShowStep(); } };
+        // advance to the next page or persist everything when finish is clicked.
         next.Click += (_, _) =>
         {
             if (step == 0) { step = 1; ShowStep(); }
             else
             {
+                // mark the first-run setup complete only when saving succeeds.
                 prefs.Completed = true;
+                // display an error and keep the window open if writing preferences fails.
                 try { prefs.Save(); }
                 catch (Exception ex)
                 {
@@ -85,6 +100,7 @@ public sealed class FrmOnboarding : Form
         heading.BringToFront();
     }
 
+    // use a shared button style for consistent footer navigation.
     private Button MakeButton(string title, Color fill, int width) => new()
     {
         Text = title, Width = width, Height = 36, BackColor = fill,
@@ -92,8 +108,10 @@ public sealed class FrmOnboarding : Form
         Cursor = Cursors.Hand, Font = new Font("Segoe UI", 10)
     };
 
+    // rebuild only the current page while keeping the same wizard window.
     private void ShowStep()
     {
+        // remove controls from the previous page before drawing the next one.
         content.Controls.Clear();
         progress.Text = $"{step + 1} of 2";
         previous.Visible = step != 0;
@@ -103,6 +121,7 @@ public sealed class FrmOnboarding : Form
         else BuildClipsPage();
     }
 
+    // let the user choose the base theme, windows synchronization, contrast, and accent.
     private void BuildThemePage()
     {
         AddLabel(content, "Select a theme", new Rectangle(0, 48, 700, 34), 13, true, ContentAlignment.MiddleCenter);
@@ -111,12 +130,14 @@ public sealed class FrmOnboarding : Form
             Width = 112, Checked = !prefs.DarkTheme, ForeColor = Color.White };
         var dark = new RadioButton { Text = "Dark", Location = new Point(369, 205),
             Width = 112, Checked = prefs.DarkTheme, ForeColor = Color.White };
+        // update the in-memory selection as soon as a radio option changes.
         light.CheckedChanged += (_, _) => { if (light.Checked) prefs.DarkTheme = false; };
         dark.CheckedChanged += (_, _) => { if (dark.Checked) prefs.DarkTheme = true; };
         content.Controls.Add(light);
         content.Controls.Add(dark);
         var lp = new ThemeThumbnail(false) { Location = new Point(228, 105), Size = new Size(110, 80) };
         var dp = new ThemeThumbnail(true) { Location = new Point(368, 105), Size = new Size(110, 80) };
+        // clicking the theme thumbnail selects the matching radio button.
         lp.Click += (_, _) => light.Checked = true;
         dp.Click += (_, _) => dark.Checked = true;
         content.Controls.Add(lp);
@@ -126,6 +147,7 @@ public sealed class FrmOnboarding : Form
             AutoSize = true, Location = new Point(265, 260), ForeColor = Color.White };
         var contrast = new CheckBox { Text = "Enable high-contrast", Checked = prefs.HighContrast,
             AutoSize = true, Location = new Point(265, 307), ForeColor = Color.White };
+        // disable manual theme selection while the windows theme is being followed.
         follow.CheckedChanged += (_, _) =>
         {
             prefs.FollowSystemTheme = follow.Checked;
@@ -137,6 +159,7 @@ public sealed class FrmOnboarding : Form
         content.Controls.Add(contrast);
         AddLabel(content, "Accent color", new Rectangle(0, 357, 700, 30), 10, false, ContentAlignment.MiddleCenter);
 
+        // add one selectable color swatch for each supported accent.
         for (int i = 0; i < accents.Length; i++)
         {
             Color swatch = accents[i];
@@ -144,6 +167,7 @@ public sealed class FrmOnboarding : Form
             {
                 Location = new Point(226 + i * 37, 392), Size = new Size(30, 30), Cursor = Cursors.Hand
             };
+            // update the stored color and selection outline without leaving the page.
             circle.Click += (_, _) =>
             {
                 prefs.AccentHex = ColorTranslator.ToHtml(swatch);
@@ -155,6 +179,7 @@ public sealed class FrmOnboarding : Form
         }
     }
 
+    // show the colorful and classic visualization options next to a live preview.
     private void BuildClipsPage()
     {
         var left = new Panel { Dock = DockStyle.Left, Width = 349, BackColor = bg };
@@ -165,6 +190,7 @@ public sealed class FrmOnboarding : Form
 
         var colorful = CreateChoice(left, "Colorful", "Each track gets a new color", 76, prefs.ColorfulClips);
         var classic = CreateChoice(left, "Classic", "The clips you know and love", 161, !prefs.ColorfulClips);
+        // keep the saved choice, radio indicator, and preview synchronized.
         Action<bool> select = (useColors) =>
         {
             prefs.ColorfulClips = useColors;
@@ -175,10 +201,12 @@ public sealed class FrmOnboarding : Form
         };
         colorful.Click += (_, _) => select(true);
         classic.Click += (_, _) => select(false);
+        // clicking labels inside an option should select the entire option.
         foreach (Control child in colorful.Controls) child.Click += (_, _) => select(true);
         foreach (Control child in classic.Controls) child.Click += (_, _) => select(false);
     }
 
+    // build a reusable selectable option with a title, description, and visual indicator.
     private Panel CreateChoice(Panel parent, string name, string detail, int top, bool selected)
     {
         var box = new Panel { Location = new Point(30, top), Size = new Size(290, 75),
@@ -196,6 +224,7 @@ public sealed class FrmOnboarding : Form
         return box;
     }
 
+    // visually distinguish the selected option and request a border redraw.
     private void UpdateChoice(Panel box, bool selected)
     {
         box.Tag = selected;
@@ -205,6 +234,7 @@ public sealed class FrmOnboarding : Form
         box.Invalidate();
     }
 
+    // centralize label creation to avoid repeating font and positioning code.
     private static Label AddLabel(Control target, string text, Rectangle position, float fontSize,
         bool bold = false, ContentAlignment alignment = ContentAlignment.MiddleLeft)
     {
@@ -215,10 +245,12 @@ public sealed class FrmOnboarding : Form
         return label;
     }
 
+    // paint a lightweight preview of either the light or dark interface.
     private sealed class ThemeThumbnail : Control
     {
         private readonly bool dark;
         public ThemeThumbnail(bool useDark) { dark = useDark; Cursor = Cursors.Hand; }
+        // the miniature preview is drawn directly rather than loaded from an image.
         protected override void OnPaint(PaintEventArgs e)
         {
             var g = e.Graphics;
@@ -237,9 +269,11 @@ public sealed class FrmOnboarding : Form
         }
     }
 
+    // custom control for a round accent choice with a selection outline.
     private sealed class ColorSwatch : Control
     {
         public Color Shade { get; }
+        // the selection state determines whether the white outer ring appears.
         public bool Selected { get; set; }
         public ColorSwatch(Color shade, bool selected) { Shade = shade; Selected = selected; }
         protected override void OnPaint(PaintEventArgs e)
@@ -252,8 +286,10 @@ public sealed class FrmOnboarding : Form
         }
     }
 
+    // demonstrate how the same audio clips look under either visualization style.
     private sealed class WavePreview : Control
     {
+        // changing this property and invalidating the control redraws the preview.
         public bool Colorful { get; set; }
         public WavePreview() { BackColor = Color.FromArgb(39, 41, 55); DoubleBuffered = true; }
         protected override void OnPaint(PaintEventArgs e)
@@ -262,11 +298,14 @@ public sealed class FrmOnboarding : Form
             var g = e.Graphics;
             g.SmoothingMode = SmoothingMode.AntiAlias;
             using var gridPen = new Pen(Color.FromArgb(50, 55, 69));
+            // draw a subtle grid behind the sample clips.
             for (int x = 0; x < Width; x += 30) g.DrawLine(gridPen, x, 0, x, Height);
             for (int y = 0; y < Height; y += 100) g.DrawLine(gridPen, 0, y, Width, y);
+            // use a different pastel for each row when colorful mode is selected.
             Color[] colors = { Color.FromArgb(155, 198, 252), Color.FromArgb(177, 170, 251),
                 Color.FromArgb(238, 172, 217), Color.FromArgb(251, 157, 161), Color.FromArgb(255, 182, 136) };
             int rowHeight = 98;
+            // draw several staggered tracks to resemble a multitrack audio editor.
             for (int row = 0; row < 5; row++)
             {
                 int offset = row % 2 == 0 ? 0 : 165;
@@ -285,6 +324,7 @@ public sealed class FrmOnboarding : Form
                     g.DrawLine(line, rect.Left, center, rect.Right, center);
                     var points = new System.Collections.Generic.List<PointF>();
                     int count = Math.Max(1, rect.Width / 2);
+                    // approximate an audio envelope using smooth peaks for the preview.
                     for (int i = 0; i < count; i++)
                     {
                         double t = (double)i / count;
@@ -293,6 +333,7 @@ public sealed class FrmOnboarding : Form
                         float amp = (float)(envelope * (0.25 + .75 * Math.Abs(Math.Sin(i * .75))));
                         points.Add(new PointF(rect.Left + i * 2, center - amp));
                     }
+                    // mirror upper points to close the filled waveform shape.
                     for (int i = count - 1; i >= 0; i--)
                         points.Add(new PointF(points[i].X, 2 * center - points[i].Y));
                     if (points.Count > 2)

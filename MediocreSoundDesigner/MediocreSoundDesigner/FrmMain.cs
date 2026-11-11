@@ -5,16 +5,20 @@ namespace MediocreSoundDesigner;
 
 public partial class FrmMain : Form {
   // fields
+  // manage imported audio tracks, selection, drawing, and playback.
   private TrackManager trackManager;
 
   // ctor
+  // initialize the editor, then attach the appearance menu and resize handler.
   public FrmMain() {
     InitializeComponent();
     Setup();
+    AddAppearanceMenu();
     SizeChanged += FrmMain_SizeChanged;
   }
 
   // setup
+  // configure the track display, playback button, and timeline controls.
   private void Setup() {
     DoubleBuffered = true;
     trackManager = new(panTracks);
@@ -22,74 +26,74 @@ public partial class FrmMain : Form {
     trackManager.DrawTimescale = trkDrawTimescale.Value;
     UpdateSizes();
     ApplySettings();
-    SetupScrubber(); // Initialize the scrubber
+    SetupScrubber(); // initialize the scrubber
     }
+  // refresh visible editor colors from the shared application palette.
   private void ApplySettings() {
     BackColor = Settings.Color.WinBg;
+    ForeColor = Settings.Color.WinFg;
     panTracks.BackColor = Settings.Color.TrackBg_Unselected;
     lblPlayhead.BackColor = Settings.Color.Playline;
     trackManager.ApplySettings();
   }
 
-    // GUI controls
-    protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
-    {
-        Track selectedTrack = trackManager.SelectedTrack;
-        if (selectedTrack is not null)
-        {
-            if (keyData == Keys.Left)
-            {
-                selectedTrack.ShiftSampleOver(-5);
-                selectedTrack.PanDrawSamples.Invalidate();
-                return true;
-            }
-            else if (keyData == Keys.Right)
-            {
-                selectedTrack.ShiftSampleOver(+5);
-                selectedTrack.PanDrawSamples.Invalidate();
-                return true;
-            }
-            else if (keyData == Keys.Delete)
-            {
-                if (selectedTrack.SelectedClip is not null & selectedTrack.Clips.Count != 1)
-                {
-                    if (MessageBox.Show("This will delete the selected clip. This is NOT undoable!", "Are You Sure?", MessageBoxButtons.YesNo, MessageBoxIcon.Exclamation) == DialogResult.Yes)
-                    {
-                        selectedTrack.RemoveSelectedClip();
-                        selectedTrack.PanDrawSamples.Invalidate();
-                    }
-                }
-                else
-                {
-                    if (MessageBox.Show("This will delete the selected track. This is NOT undoable!", "Are You Sure?", MessageBoxButtons.YesNo, MessageBoxIcon.Exclamation) == DialogResult.Yes)
-                    {
-                        trackManager.RemTrack(selectedTrack);
-                        panTracks.Controls.Remove(selectedTrack.PanDrawSamples);
-                        selectedTrack.Dispose();
-                        UpdateSizes();
-                    }
-                }
-                return true;
-            }
-        }
-        return base.ProcessCmdKey(ref msg, keyData);
-    }
+  // let users revisit the same choices without resetting their setup
+  // allow users to reopen the wizard without resetting the first-run flag.
+  private void AddAppearanceMenu() {
+    ToolStripMenuItem appearance = new("Appearance...");
+    appearance.Click += (sender, e) => {
+      // load a fresh copy so the wizard begins with the last saved choices.
+      var preferences = OnboardingPreferences.Load();
+      using var wizard = new FrmOnboarding(preferences, editingAppearance: true);
+      // only apply and redraw when the user saves changes with finish.
+      if (wizard.ShowDialog(this) == DialogResult.OK) {
+        preferences.ApplyToAppColors();
+        ApplySettings();
+        // force existing tracks to repaint with the updated shared colors.
+        foreach (Track track in trackManager.Tracks)
+          track.PanDrawSamples.Invalidate();
+        Invalidate(true);
+      }
+    };
+    menuFile.DropDownItems.Add(appearance);
+  }
 
+  // gui controls
+  // provide keyboard shortcuts for nudging or deleting the selected track.
+  protected override bool ProcessCmdKey(ref Message msg, Keys keyData) {
+    if (trackManager.SelectedTrack is not null) {
+      if (keyData == Keys.Left) {
+        trackManager.SelectedTrack.ShiftSampleOver(-5);
+        trackManager.SelectedTrack.PanDrawSamples.Invalidate();
+        return true;
+      }
+      else if (keyData == Keys.Right) {
+        trackManager.SelectedTrack.ShiftSampleOver(+5);
+        trackManager.SelectedTrack.PanDrawSamples.Invalidate();
+        return true;
+      }
+      else if (keyData == Keys.Delete) {
+        if (trackManager.SelectedTrack is not null) {
+          if (MessageBox.Show("This will delete the selected track. This is NOT undoable!", "Are You Sure?", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Exclamation) == DialogResult.Yes) {
+            panTracks.Controls.Remove(trackManager.SelectedTrack.PanDrawSamples);
+            trackManager.SelectedTrack.PanDrawSamples.Dispose();
+            trackManager.SelectedTrack.Dispose();
+            trackManager.RemTrack(trackManager.SelectedTrack);
+            UpdateSizes();
+            return true;
+          }
+        }
+      }
+    }
+    return base.ProcessCmdKey(ref msg, keyData);
+  }
+
+  // resize the timeline and track panels when the editor window changes size.
   private void FrmMain_SizeChanged(object sender, EventArgs e) {
     UpdateSizes();
   }
 
-  //private void btnPlay_Click(object sender, EventArgs e) {
-  //  if (trackManager.State is NAudio.Wave.PlaybackState.Stopped or NAudio.Wave.PlaybackState.Paused) {
-  //    trackManager.PlayAll();
-  //    btnPlay.BackgroundImage = Resources.pause;
-  //  }
-  //  else {
-  //    trackManager.PauseAll();
-  //    btnPlay.BackgroundImage = Resources.play;
-  //  }
-  //}
-
+    // start playback at the chosen scrubber position or pause current playback.
     private void btnPlay_Click(object sender, EventArgs e) {
       if (trackManager.State is NAudio.Wave.PlaybackState.Stopped or NAudio.Wave.PlaybackState.Paused) {
         trackManager.PlayAllFrom(trkScrubber?.Value ?? 0);
@@ -101,6 +105,7 @@ public partial class FrmMain : Form {
       }
     }
 
+  // import a wave file and add its waveform panel to the editor.
   private void menuFileOpen_Click(object sender, EventArgs e) {
     ofdLoadFile.DefaultExt = "wav";
     if (ofdLoadFile.ShowDialog() == DialogResult.OK) {
@@ -111,12 +116,14 @@ public partial class FrmMain : Form {
       newTrack.PanDrawSamples.Invalidate();
     }
   }
+  // export the current audio mix through the track manager.
   private void menuFileSave_Click(object sender, EventArgs e) {
     sfdSaveFile.DefaultExt = "wav";
     if (sfdSaveFile.ShowDialog() == DialogResult.OK) {
       trackManager.SaveToFile(sfdSaveFile.FileName);
     }
   }
+  // open the existing color settings dialog and refresh its changes.
   private void menuFileSettings_Click(object sender, EventArgs e) {
     FrmEditSettings frm = new();
     frm.SetSound(trackManager.SelectedTrack);
@@ -125,12 +132,15 @@ public partial class FrmMain : Form {
     }
   }
 
+  // invert the selected waveform vertically.
   private void menuEditFlip_Click(object sender, EventArgs e) {
     trackManager.SelectedTrack?.Flip();
   }
+  // reverse the order of samples in the selected track.
   private void menuEditReverse_Click(object sender, EventArgs e) {
     trackManager.SelectedTrack?.Reverse();
   }
+  // open the volume adjustment dialog for the selected track.
   private void menuEditVolume_Click(object sender, EventArgs e) {
     if (trackManager.SelectedTrack is not null) {
       FrmEditVolume frm = new();
@@ -138,30 +148,17 @@ public partial class FrmMain : Form {
       frm.ShowDialog();
     }
   }
+  // open silence removal controls for the selected track.
   private void menuEditEliminateSilence_Click(object sender, EventArgs e) {
-    if (trackManager.SelectedTrack?.SelectedClip is not null) {
+    if (trackManager.SelectedTrack is not null) {
       FrmEditEliminateSilence frm = new();
       frm.SetSound(trackManager.SelectedTrack);
       frm.ShowDialog();
     }
   }
 
-  private void menuEditSplit_Click(object sender, EventArgs e) {
-    // Split works on the selected track, like every other Edit menu command.
-    Track track = trackManager.SelectedTrack;
-    if (track is null) return;
-
-     // Split the clip under the edit cursor (a pixel X position). Both halves
-     // stay on this track, so there are no new panels or rows and UpdateSizes
-     // isn't needed. SplitAt returns false if the cursor isn't inside a clip.
-     if (track.SplitAt(scrubbedXPosition))
-     {
-         // Repaint so the new clip edge and the selection outline appear.
-         track.PanDrawSamples.Invalidate();
-     }
-  }
-
-    private void menuGenRecord_Click(object sender, EventArgs e) {
+  // create a new track and let the user record microphone audio into it.
+  private void menuGenRecord_Click(object sender, EventArgs e) {
     Track newTrack = new(new float[0]);
     CreateTrackPanel(newTrack);
     trackManager.AddTrack(newTrack);
@@ -174,6 +171,7 @@ public partial class FrmMain : Form {
       trackManager.RemTrack(newTrack);
     }
   }
+  // generate a track containing randomized white-noise samples.
   private void menuGenNoise_Click(object sender, EventArgs e) {
     const int NUM_SAMPLES = 100_000;
     float[] samples = new float[NUM_SAMPLES];
@@ -187,6 +185,7 @@ public partial class FrmMain : Form {
     UpdateSizes();
     newTrack.PanDrawSamples.Invalidate();
   }
+  // generate slowly varying random values for a smoother noise waveform.
   private void menuGenGradientNoise_Click(object sender, EventArgs e) {
     const int NUM_SAMPLES = 250_000;
     float[] samples = new float[NUM_SAMPLES];
@@ -214,20 +213,7 @@ public partial class FrmMain : Form {
     newTrack.PanDrawSamples.Invalidate();
   }
 
-    //private void tmrUpdatePlaybackState_Tick(object sender, EventArgs e) {
-    //  if (trackManager.Tracks.Count > 0) {
-    //    btnPlay.BackgroundImage = trackManager.State == NAudio.Wave.PlaybackState.Playing ? Resources.pause : Resources.play;
-    //    btnPlay.Visible = true;
-    //    lblPlayhead.Left = trackManager.GetPlayheadPos();
-    //    lblPlayhead.Visible = true;
-    //  }
-    //  else {
-    //    btnPlay.BackgroundImage = null;
-    //    btnPlay.Visible = false;
-    //    lblPlayhead.Visible = false;
-    //  }
-    //}
-
+    // synchronize the play button, playhead, and slider with playback state.
     private void tmrUpdatePlaybackState_Tick(object sender, EventArgs e)
     {
         if (trackManager.Tracks.Count > 0)
@@ -236,8 +222,10 @@ public partial class FrmMain : Form {
             btnPlay.BackgroundImage = isPlaying ? Resources.pause : Resources.play;
             btnPlay.Visible = true;
 
+            // avoid moving the slider programmatically while the user drags it.
             if (!isScrubbing)
             {
+                // show the live playback location only while audio is running.
                 if (isPlaying)
                 {
                     int pos = trackManager.GetPlayheadPos();
@@ -267,12 +255,14 @@ public partial class FrmMain : Form {
         }
     }
 
+    // update waveform zoom when the timescale slider moves.
     private void trkDrawTimescale_Scroll(object sender, EventArgs e) {
     trackManager.DrawTimescale = trkDrawTimescale.Maximum - trkDrawTimescale.Value;
     trackManager.RedrawAll();
   }
 
-  // Helper methods
+  // helper methods
+  // create a clickable and paintable panel for a newly added audio track.
   private Panel CreateTrackPanel(Track track) {
     Panel pan = new() {
       BackColor = Settings.Color.TrackBg_Unselected,
@@ -280,33 +270,16 @@ public partial class FrmMain : Form {
       Left = 0,
       Top = 0,
     };
+    // a single click selects the track for keyboard and editing commands.
     pan.Click += (sender, e) => {
       trackManager.SelectTrack(track);
     };
-    pan.MouseClick += (sender, e) =>
-    {
-        // MouseClick reports the mouse position
-        // clicking a track does two more things:
-        //      1. moves the timeline head to the clicked position
-        //      2. selects the clip under the mouse, if there is one
-
-        // track panels sit at Left = 0 inside panTracks. the scrubber's range is 0..panTracks.Width
-        // Math.Clamp allegedly keeps the value inside the range that TrackBar accepts
-        scrubbedXPosition = Math.Clamp(e.X, trkScrubber.Minimum, trkScrubber.Maximum);
-
-        // moves scrubber thumb and playhead line to the clicked point
-        // as a plus this also sets where playback starts (W rizz)
-        trkScrubber.Value = scrubbedXPosition;
-        lblPlayhead.Left = scrubbedXPosition;
-
-        // selects the clicked clip and then repaints the outline
-        track.SelectClipAt(e.X);
-        track.PanDrawSamples.Invalidate();
-    };
+    // double-click to enable or disable the track without removing it.
     pan.DoubleClick += (sender, e) => {
       track.ToggleDisabled();
       track.PanDrawSamples.Invalidate();
     };
+    // delegate waveform rendering to the track object.
     pan.Paint += (sender, e) => {
       track.DrawSamples(e.Graphics, trackManager.DrawTimescale);
     };
@@ -317,6 +290,7 @@ public partial class FrmMain : Form {
     return pan;
   }
 
+  // arrange track panels and adjust the scrubber width after layout changes.
   private void UpdateSizes() {
     const int PADDING = 15;
 
@@ -345,10 +319,14 @@ public partial class FrmMain : Form {
     lblPlayhead.BringToFront();
   }
 
+    // the scrubber lets users select a horizontal playback starting position.
     private TrackBar trkScrubber;
+    // prevent the playback timer from overriding active dragging.
     private bool isScrubbing = false;
+    // remember the last manually chosen position when playback stops.
     private int scrubbedXPosition = 0;
 
+    // create the timeline slider dynamically above the track area.
     private void SetupScrubber()
     {
         trkScrubber = new TrackBar
@@ -370,17 +348,20 @@ public partial class FrmMain : Form {
         trkScrubber.BringToFront();
     }
 
+    // mark the start of a manual seek operation.
     private void trkScrubber_MouseDown(object sender, MouseEventArgs e)
     {
         isScrubbing = true;
     }
 
+    // update the playhead to reflect the slider position immediately.
     private void trkScrubber_Scroll(object sender, EventArgs e)
     {
         scrubbedXPosition = trkScrubber.Value;
         lblPlayhead.Left = scrubbedXPosition;
     }
 
+    // finish the seek and restart playback from the new position if needed.
     private void trkScrubber_MouseUp(object sender, MouseEventArgs e)
     {
         isScrubbing = false;
