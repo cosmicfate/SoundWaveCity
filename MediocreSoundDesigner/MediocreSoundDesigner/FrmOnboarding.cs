@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
@@ -274,6 +275,8 @@ public sealed class FrmOnboarding : Form
     {
         public Color Shade { get; }
         // the selection state determines whether the white outer ring appears.
+        [Browsable(false)]
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
         public bool Selected { get; set; }
         public ColorSwatch(Color shade, bool selected) { Shade = shade; Selected = selected; }
         protected override void OnPaint(PaintEventArgs e)
@@ -290,6 +293,8 @@ public sealed class FrmOnboarding : Form
     private sealed class WavePreview : Control
     {
         // changing this property and invalidating the control redraws the preview.
+        [Browsable(false)]
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
         public bool Colorful { get; set; }
         public WavePreview() { BackColor = Color.FromArgb(39, 41, 55); DoubleBuffered = true; }
         protected override void OnPaint(PaintEventArgs e)
