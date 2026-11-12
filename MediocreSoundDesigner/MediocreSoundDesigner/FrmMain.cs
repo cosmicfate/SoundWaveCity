@@ -379,7 +379,7 @@ public partial class FrmMain : Form
         {
             track.DrawSamples(e.Graphics, trackManager.DrawTimescale);
         };
-        enableClipDragDrop(track,pan);
+        EnableClipDragDrop(track,pan);
         panTracks.Controls.Add(pan);
         track.LinkPanels(pan, panTracks);
         trackManager.SelectTrack(track);
