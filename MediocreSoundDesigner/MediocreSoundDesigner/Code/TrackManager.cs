@@ -73,7 +73,29 @@ public class TrackManager {
         return true; // :)
     }
 
-  public void RedrawAll() {
+    // now that we know a clip can be moved, actually move it.
+    public bool MoveClip(Track source, Track target, Clip clip, int startSample, out string errorMessage)
+    {
+        if (!CanIMoveClip(source, target, clip, startSample, out errorMessage))
+        {
+            return false; // can't move it
+        }
+        // remove from source track
+        source.Clips.Remove(clip);
+        // add to target track
+        if (!target.AttachClip(clip, startSample))
+        {
+            errorMessage = "Failed to attach the clip to the target track.";
+            return false;
+        }
+
+        SelectTrack(target); // select the target track after moving the clip
+        source.PanDrawSamples?.Invalidate(); // redraw the source track
+        target.PanDrawSamples?.Invalidate(); // redraw the target track
+        return true; // :)
+    }
+
+    public void RedrawAll() {
     Tracks.ForEach(track => track.PanDrawSamples.Invalidate());
   }
 
