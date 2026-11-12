@@ -294,7 +294,6 @@ public class Track : IDisposable
             if (startSample < c.EndSample && endSample > c.StartSample)
             {
                 return false; // overlap detected
-                MessageBox.Show("Cannot place clip here. It would overlap with another clip.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
         return true;

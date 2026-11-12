@@ -1,4 +1,5 @@
 ﻿using NAudio.Wave;
+using MediocreSoundDesigner.code;
 
 namespace MediocreSoundDesigner; 
 
@@ -40,6 +41,37 @@ public class TrackManager {
     track.PanDrawSamples.BorderStyle = BorderStyle.Fixed3D;
     track.PanDrawSamples.BackColor = Settings.Color.TrackBg_Selected;
   }
+
+    // make sure a clip can be moved from one track to another, without actually moving it.
+    public bool CanIMoveClip(Track source, Track target, Clip clip, int startSample, out string errorMessage)
+    { 
+        errorMessage = string.Empty;
+        if(source == null || target == null || clip == null || !Tracks.Contains(source) || !Tracks.Contains(target))
+        {
+            errorMessage = "Invalid track or clip specified.";
+            return false;
+        }
+
+        if (State == PlaybackState.playing)
+        {
+            errorMessage = "Cannot move clips while playback is active. Please pause playback first.";
+            return false;
+        }
+
+        if(!source.Clips.Contains(clip))
+        {
+            errorMessage = "The specified clip does not belong to the source track.";
+            return false;
+        }
+
+        if (!target.CanIPlaceClip(clip, startSample))
+        {
+            errorMessage = "Cannot place the clip at the specified position on the target track.";
+            return false;
+        }
+
+        return true; // :)
+    }
 
   public void RedrawAll() {
     Tracks.ForEach(track => track.PanDrawSamples.Invalidate());
