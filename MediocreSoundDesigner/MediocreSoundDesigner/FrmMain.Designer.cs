@@ -41,7 +41,6 @@
       menuEditReverse = new ToolStripMenuItem();
       menuEditVolume = new ToolStripMenuItem();
       menuEditEliminateSilence = new ToolStripMenuItem();
-      menuEditSplit = new ToolStripMenuItem();
       menuGen = new ToolStripMenuItem();
       menuGenRecord = new ToolStripMenuItem();
       menuGenNoise = new ToolStripMenuItem();
@@ -122,7 +121,7 @@
       // 
       // menuEdit
       // 
-      menuEdit.DropDownItems.AddRange(new ToolStripItem[] { menuEditFlip, menuEditReverse, menuEditVolume, menuEditEliminateSilence, menuEditSplit });
+       menuEdit.DropDownItems.AddRange(new ToolStripItem[] { menuEditFlip, menuEditReverse, menuEditVolume, menuEditEliminateSilence });
       menuEdit.Name = "menuEdit";
       menuEdit.Size = new Size(39, 20);
       menuEdit.Text = "E&dit";
@@ -154,16 +153,6 @@
       menuEditEliminateSilence.Size = new Size(180, 22);
       menuEditEliminateSilence.Text = "Eliminate Silence...";
       menuEditEliminateSilence.Click += menuEditEliminateSilence_Click;
-      //
-      // menuEditSplit
-      //
-      menuEditSplit.Name = "menuEditSplit";
-      menuEditSplit.Size = new Size(180, 22);
-      menuEditSplit.Text = "Split";
-      // split shortcut / hotkey is CTRL + I like Audacity
-      menuEditSplit.ShortcutKeys = Keys.Control | Keys.I;
-      menuEditSplit.Click += menuEditSplit_Click;
-      // 
       // menuGen
       // 
       menuGen.DropDownItems.AddRange(new ToolStripItem[] { menuGenRecord, menuGenNoise, menuGenGradientNoise });
@@ -282,7 +271,6 @@
     private TrackBar trkDrawTimescale;
     private ColorDialog colorDialog;
     private ToolStripMenuItem menuEditEliminateSilence;
-    private ToolStripMenuItem menuEditSplit;
     private Label lblPlayhead;
     private ToolStripMenuItem menuGenRecord;
     private ToolStripMenuItem menuFileSettings;

@@ -238,7 +238,7 @@ public class Track : IDisposable
         return SelectedClip is not null;
     }
 
-    // Split: splits the clip at the panel X position into two separate clips on the track.
+    // SplitAt: splits the clip at the panel X position into two separate clips on the track.
     // returns false if nothing is split either because the point is not inside a clip or if 
     // the point is at the clip's very first sample
     public bool SplitAt(int panelX)

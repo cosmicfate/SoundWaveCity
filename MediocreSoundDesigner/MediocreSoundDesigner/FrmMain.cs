@@ -106,6 +106,11 @@ public partial class FrmMain : Form
                 }
                 return true;
             }
+            else if (keyData == (Keys.Control | Keys.I))
+            {
+                SplitSelectedTrack();
+                return true;
+            }
         }
         return base.ProcessCmdKey(ref msg, keyData);
     }
@@ -195,7 +200,7 @@ public partial class FrmMain : Form
         }
     }
 
-    private void menuEditSplit_Click(object sender, EventArgs e)
+    private void SplitSelectedTrack()
     {
         // Split works on the selected track, like every other Edit menu command.
         Track track = trackManager.SelectedTrack;
