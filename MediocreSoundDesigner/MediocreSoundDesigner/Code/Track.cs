@@ -54,6 +54,8 @@ public class Track : IDisposable
     public bool IsDisabled { get; private set; }
     public Panel PanDrawSamples { get; private set; }
     public float Volume { get; private set; }
+    public int SampleRate => sampleRate;
+    public int channelCount => channels;
     private string tempFilePath => Path.Combine(Path.GetTempPath(), "MediocreSoundDesigner", "temp.wav");
     public PlaybackState State => outputDevice?.PlaybackState ?? PlaybackState.Stopped;
 
@@ -269,6 +271,52 @@ public class Track : IDisposable
         return true;
     }
 
+    // convert the horizontal panel position to a sample position in the track's timeline. 
+    public int SamplePositionAt(int panelX)
+    {
+        long position = (long)Math.max(0, panelX) * Math.Max(1, drawTimescale); // convert to sample position
+        return (int)Math.min(int.MaxValue, position); // clamp to int range)
+    }
+
+    public bool CanIPlaceClip(Clip clip, int startSample)
+    {
+        int channelCount = Math.Max(1, channels);
+        long endSample = (long)startSample + clip.Samples.Length;
+
+        if (clip is null || clip.Samples.Length == 0 || startSample < 0) return false;
+        if (startSample % channelCount != 0 || clip.Samples.Length % channelCount != 0) return false; // clip must be aligned to channel boundaries
+        if(endSample > int.MaxValue) return false; // clip must fit within int range
+
+        // check for overlap with existing clips
+        foreach (Clip c in clips)
+        {
+            if (c == clip) continue; // skip the clip being moved
+            if (startSample < c.EndSample && endSample > c.StartSample)
+            {
+                return false; // overlap detected
+                MessageBox.Show("Cannot place clip here. It would overlap with another clip.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+        return true;
+    }
+
+    internal bool detachClip(Clip clip)
+    {
+        if (clip is null || !clips.Remove(clip)) return false; // clip is null or not found in the list
+        if (ReferenceEquals(SelectedClip, clip)) SelectedClip = null; // deselect if the removed clip was selected
+        return true;
+    }
+
+    internal bool AttachClip(Clip clip, int startSample)
+    {
+        if (clip is null || !CanIPlaceClip(clip, startSample)) return false; // clip is null or cannot be placed at the specified position
+        int insertIndex = clips.FindIndex(c => c.StartSample > startSample);
+        if (insertIndex == -1) clips.Add(clip) // add to the end if no clip starts after the specified position
+        else clips.Insert(insertIndex, clip); // insert before the first clip that starts after the specified position
+        SelectedClip = clip; // select the newly attached clip
+        return true;
+    }
+
     // play
     public void Play()
     {
@@ -330,6 +378,7 @@ public class Track : IDisposable
     }
     public float[] GetAdjustedSamples()
     {
+        if (clips.Count == 0) return Array.Empty<float>();
         int length = clips.Max(c => c.EndSample);
         float[] adjusted = new float[length];
 
