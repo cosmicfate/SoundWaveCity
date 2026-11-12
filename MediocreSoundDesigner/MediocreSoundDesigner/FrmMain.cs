@@ -14,6 +14,7 @@ public partial class FrmMain : Form
     {
         InitializeComponent();
         Setup();
+        InitalizeTimeLineZoom();
         AddAppearanceMenu();
         AddQuickAccessToolbar();
         SizeChanged += FrmMain_SizeChanged;
