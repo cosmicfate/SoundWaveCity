@@ -1,223 +1,280 @@
 using MediocreSoundDesigner.Properties;
-using System.Text.Json;
 
 namespace MediocreSoundDesigner;
 
-public partial class FrmMain : Form {
-  // fields
-  // manage imported audio tracks, selection, drawing, and playback.
-  private TrackManager trackManager;
+public partial class FrmMain : Form
+{
+    // fields
+    // manage imported audio tracks, selection, drawing, and playback.
+    private TrackManager trackManager;
 
-  // ctor
-  // initialize the editor, then attach the appearance menu and resize handler.
-  public FrmMain() {
-    InitializeComponent();
-    Setup();
-    AddAppearanceMenu();
-    SizeChanged += FrmMain_SizeChanged;
-  }
-
-  // setup
-  // configure the track display, playback button, and timeline controls.
-  private void Setup() {
-    DoubleBuffered = true;
-    trackManager = new(panTracks);
-    btnPlay.BackgroundImage = Resources.play;
-    trackManager.DrawTimescale = trkDrawTimescale.Value;
-    UpdateSizes();
-    ApplySettings();
-    SetupScrubber(); // initialize the scrubber
+    // ctor
+    // initialize the editor, then attach the appearance menu and resize handler.
+    public FrmMain()
+    {
+        InitializeComponent();
+        Setup();
+        AddAppearanceMenu();
+        SizeChanged += FrmMain_SizeChanged;
     }
-  // refresh visible editor colors from the shared application palette.
-  private void ApplySettings() {
-    BackColor = Settings.Color.WinBg;
-    ForeColor = Settings.Color.WinFg;
-    panTracks.BackColor = Settings.Color.TrackBg_Unselected;
-    lblPlayhead.BackColor = Settings.Color.Playline;
-    trackManager.ApplySettings();
-  }
 
-  // let users revisit the same choices without resetting their setup
-  // allow users to reopen the wizard without resetting the first-run flag.
-  private void AddAppearanceMenu() {
-    ToolStripMenuItem appearance = new("Appearance...");
-    appearance.Click += (sender, e) => {
-      // load a fresh copy so the wizard begins with the last saved choices.
-      var preferences = OnboardingPreferences.Load();
-      using var wizard = new FrmOnboarding(preferences, editingAppearance: true);
-      // only apply and redraw when the user saves changes with finish.
-      if (wizard.ShowDialog(this) == DialogResult.OK) {
-        preferences.ApplyToAppColors();
+    // setup
+    // configure the track display, playback button, and timeline controls.
+    private void Setup()
+    {
+        DoubleBuffered = true;
+        trackManager = new(panTracks);
+        btnPlay.BackgroundImage = Resources.play;
+        trackManager.DrawTimescale = trkDrawTimescale.Value;
+        UpdateSizes();
         ApplySettings();
-        // force existing tracks to repaint with the updated shared colors.
-        foreach (Track track in trackManager.Tracks)
-          track.PanDrawSamples.Invalidate();
-        Invalidate(true);
-      }
-    };
-    menuFile.DropDownItems.Add(appearance);
-  }
-
-  // gui controls
-  // provide keyboard shortcuts for nudging or deleting the selected track.
-  protected override bool ProcessCmdKey(ref Message msg, Keys keyData) {
-    if (trackManager.SelectedTrack is not null) {
-      if (keyData == Keys.Left) {
-        trackManager.SelectedTrack.ShiftSampleOver(-5);
-        trackManager.SelectedTrack.PanDrawSamples.Invalidate();
-        return true;
-      }
-      else if (keyData == Keys.Right) {
-        trackManager.SelectedTrack.ShiftSampleOver(+5);
-        trackManager.SelectedTrack.PanDrawSamples.Invalidate();
-        return true;
-      }
-      else if (keyData == Keys.Delete) {
-        if (trackManager.SelectedTrack is not null) {
-          if (MessageBox.Show("This will delete the selected track. This is NOT undoable!", "Are You Sure?", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Exclamation) == DialogResult.Yes) {
-            panTracks.Controls.Remove(trackManager.SelectedTrack.PanDrawSamples);
-            trackManager.SelectedTrack.PanDrawSamples.Dispose();
-            trackManager.SelectedTrack.Dispose();
-            trackManager.RemTrack(trackManager.SelectedTrack);
-            UpdateSizes();
-            return true;
-          }
-        }
-      }
+        SetupScrubber(); // initialize the scrubber
     }
-    return base.ProcessCmdKey(ref msg, keyData);
-  }
+    // refresh visible editor colors from the shared application palette.
+    private void ApplySettings()
+    {
+        BackColor = Settings.Color.WinBg;
+        ForeColor = Settings.Color.WinFg;
+        panTracks.BackColor = Settings.Color.TrackBg_Unselected;
+        lblPlayhead.BackColor = Settings.Color.Playline;
+        trackManager.ApplySettings();
+    }
 
-  // resize the timeline and track panels when the editor window changes size.
-  private void FrmMain_SizeChanged(object sender, EventArgs e) {
-    UpdateSizes();
-  }
+    // let users revisit the same choices without resetting their setup
+    // allow users to reopen the wizard without resetting the first-run flag.
+    private void AddAppearanceMenu()
+    {
+        ToolStripMenuItem appearance = new("Appearance...");
+        appearance.Click += (sender, e) =>
+        {
+            // load a fresh copy so the wizard begins with the last saved choices.
+            var preferences = OnboardingPreferences.Load();
+            using var wizard = new FrmOnboarding(preferences, editingAppearance: true);
+            // only apply and redraw when the user saves changes with finish.
+            if (wizard.ShowDialog(this) == DialogResult.OK)
+            {
+                preferences.ApplyToAppColors();
+                ApplySettings();
+                // force existing tracks to repaint with the updated shared colors.
+                foreach (Track track in trackManager.Tracks)
+                    track.PanDrawSamples.Invalidate();
+                Invalidate(true);
+            }
+        };
+        menuFile.DropDownItems.Add(appearance);
+    }
+
+    // gui controls
+    // provide keyboard shortcuts for nudging or deleting the selected track.
+    protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+    {
+        Track selectedTrack = trackManager.SelectedTrack;
+        if (selectedTrack is not null)
+        {
+            if (keyData == Keys.Left)
+            {
+                selectedTrack.ShiftSampleOver(-5);
+                selectedTrack.PanDrawSamples.Invalidate();
+                return true;
+            }
+            else if (keyData == Keys.Right)
+            {
+                selectedTrack.ShiftSampleOver(+5);
+                selectedTrack.PanDrawSamples.Invalidate();
+                return true;
+            }
+            else if (keyData == Keys.Delete)
+            {
+                if (selectedTrack.SelectedClip is not null & selectedTrack.Clips.Count != 1)
+                {
+                    if (MessageBox.Show("This will delete the selected CLIP. This is NOT undoable!", "Are You Sure?", MessageBoxButtons.YesNo, MessageBoxIcon.Exclamation) == DialogResult.Yes)
+                    {
+                        selectedTrack.RemoveSelectedClip();
+                        selectedTrack.PanDrawSamples.Invalidate();
+                    }
+                }
+                else
+                {
+                    if (MessageBox.Show("This will delete the selected TRACK. This is NOT undoable!", "Are You Sure?", MessageBoxButtons.YesNo, MessageBoxIcon.Exclamation) == DialogResult.Yes)
+                    {
+                        panTracks.Controls.Remove(selectedTrack.PanDrawSamples);
+                        selectedTrack.PanDrawSamples.Dispose();
+                        selectedTrack.Dispose();
+                        trackManager.RemTrack(selectedTrack);
+                        UpdateSizes();
+                    }
+                }
+                return true;
+            }
+        }
+        return base.ProcessCmdKey(ref msg, keyData);
+    }
+
+    // resize the timeline and track panels when the editor window changes size.
+    private void FrmMain_SizeChanged(object sender, EventArgs e)
+    {
+        UpdateSizes();
+    }
 
     // start playback at the chosen scrubber position or pause current playback.
-    private void btnPlay_Click(object sender, EventArgs e) {
-      if (trackManager.State is NAudio.Wave.PlaybackState.Stopped or NAudio.Wave.PlaybackState.Paused) {
-        trackManager.PlayAllFrom(trkScrubber?.Value ?? 0);
-        btnPlay.BackgroundImage = Resources.pause;
-      }
-      else {
-        trackManager.PauseAll();
-        btnPlay.BackgroundImage = Resources.play;
-      }
+    private void btnPlay_Click(object sender, EventArgs e)
+    {
+        if (trackManager.State is NAudio.Wave.PlaybackState.Stopped or NAudio.Wave.PlaybackState.Paused)
+        {
+            trackManager.PlayAllFrom(trkScrubber?.Value ?? 0);
+            btnPlay.BackgroundImage = Resources.pause;
+        }
+        else
+        {
+            trackManager.PauseAll();
+            btnPlay.BackgroundImage = Resources.play;
+        }
     }
 
-  // import a wave file and add its waveform panel to the editor.
-  private void menuFileOpen_Click(object sender, EventArgs e) {
-    ofdLoadFile.DefaultExt = "wav";
-    if (ofdLoadFile.ShowDialog() == DialogResult.OK) {
-      Track newTrack = new(ofdLoadFile.FileName);
-      CreateTrackPanel(newTrack);
-      trackManager.AddTrack(newTrack);
-      UpdateSizes();
-      newTrack.PanDrawSamples.Invalidate();
+    // import a wave file and add its waveform panel to the editor.
+    private void menuFileOpen_Click(object sender, EventArgs e)
+    {
+        ofdLoadFile.DefaultExt = "wav";
+        if (ofdLoadFile.ShowDialog() == DialogResult.OK)
+        {
+            Track newTrack = new(ofdLoadFile.FileName);
+            CreateTrackPanel(newTrack);
+            trackManager.AddTrack(newTrack);
+            UpdateSizes();
+            newTrack.PanDrawSamples.Invalidate();
+        }
     }
-  }
-  // export the current audio mix through the track manager.
-  private void menuFileSave_Click(object sender, EventArgs e) {
-    sfdSaveFile.DefaultExt = "wav";
-    if (sfdSaveFile.ShowDialog() == DialogResult.OK) {
-      trackManager.SaveToFile(sfdSaveFile.FileName);
+    // export the current audio mix through the track manager.
+    private void menuFileSave_Click(object sender, EventArgs e)
+    {
+        sfdSaveFile.DefaultExt = "wav";
+        if (sfdSaveFile.ShowDialog() == DialogResult.OK)
+        {
+            trackManager.SaveToFile(sfdSaveFile.FileName);
+        }
     }
-  }
-  // open the existing color settings dialog and refresh its changes.
-  private void menuFileSettings_Click(object sender, EventArgs e) {
-    FrmEditSettings frm = new();
-    frm.SetSound(trackManager.SelectedTrack);
-    if (frm.ShowDialog() == DialogResult.OK) {
-      ApplySettings();
+    // open the existing color settings dialog and refresh its changes.
+    private void menuFileSettings_Click(object sender, EventArgs e)
+    {
+        FrmEditSettings frm = new();
+        frm.SetSound(trackManager.SelectedTrack);
+        if (frm.ShowDialog() == DialogResult.OK)
+        {
+            ApplySettings();
+        }
     }
-  }
 
-  // invert the selected waveform vertically.
-  private void menuEditFlip_Click(object sender, EventArgs e) {
-    trackManager.SelectedTrack?.Flip();
-  }
-  // reverse the order of samples in the selected track.
-  private void menuEditReverse_Click(object sender, EventArgs e) {
-    trackManager.SelectedTrack?.Reverse();
-  }
-  // open the volume adjustment dialog for the selected track.
-  private void menuEditVolume_Click(object sender, EventArgs e) {
-    if (trackManager.SelectedTrack is not null) {
-      FrmEditVolume frm = new();
-      frm.SetSound(trackManager.SelectedTrack);
-      frm.ShowDialog();
+    // invert the selected waveform vertically.
+    private void menuEditFlip_Click(object sender, EventArgs e)
+    {
+        trackManager.SelectedTrack?.Flip();
     }
-  }
-  // open silence removal controls for the selected track.
-  private void menuEditEliminateSilence_Click(object sender, EventArgs e) {
-    if (trackManager.SelectedTrack is not null) {
-      FrmEditEliminateSilence frm = new();
-      frm.SetSound(trackManager.SelectedTrack);
-      frm.ShowDialog();
+    // reverse the order of samples in the selected track.
+    private void menuEditReverse_Click(object sender, EventArgs e)
+    {
+        trackManager.SelectedTrack?.Reverse();
     }
-  }
-  // split the selected clip at the current scrubber position.
-  private void menuEditSplit_Click(object sender, EventArgs e) {
-    if (trackManager.SelectedTrack is not null && trackManager.SelectedTrack.SplitAt(trkScrubber?.Value ?? 0)) {
-      trackManager.SelectedTrack.PanDrawSamples.Invalidate();
+    // open the volume adjustment dialog for the selected track.
+    private void menuEditVolume_Click(object sender, EventArgs e)
+    {
+        if (trackManager.SelectedTrack is not null)
+        {
+            FrmEditVolume frm = new();
+            frm.SetSound(trackManager.SelectedTrack);
+            frm.ShowDialog();
+        }
     }
-  }
+    // open silence removal controls for the selected track.
+    private void menuEditEliminateSilence_Click(object sender, EventArgs e)
+    {
+        if (trackManager.SelectedTrack is not null)
+        {
+            FrmEditEliminateSilence frm = new();
+            frm.SetSound(trackManager.SelectedTrack);
+            frm.ShowDialog();
+        }
+    }
 
-  // create a new track and let the user record microphone audio into it.
-  private void menuGenRecord_Click(object sender, EventArgs e) {
-    Track newTrack = new(new float[0]);
-    CreateTrackPanel(newTrack);
-    trackManager.AddTrack(newTrack);
-    UpdateSizes();
-    newTrack.PanDrawSamples.Invalidate();
+    private void menuEditSplit_Click(object sender, EventArgs e)
+    {
+        // Split works on the selected track, like every other Edit menu command.
+        Track track = trackManager.SelectedTrack;
+        if (track is null) return;
 
-    FrmGenRecord frm = new();
-    frm.SetSound(trackManager.SelectedTrack);
-    if (frm.ShowDialog() == DialogResult.Cancel) {
-      trackManager.RemTrack(newTrack);
+        // Split the clip under the edit cursor (a pixel X position). Both halves
+        // stay on this track, so there are no new panels or rows and UpdateSizes
+        // isn't needed. SplitAt returns false if the cursor isn't inside a clip.
+        if (track.SplitAt(scrubbedXPosition))
+        {
+            // Repaint so the new clip edge and the selection outline appear.
+            track.PanDrawSamples.Invalidate();
+        }
     }
-  }
-  // generate a track containing randomized white-noise samples.
-  private void menuGenNoise_Click(object sender, EventArgs e) {
-    const int NUM_SAMPLES = 100_000;
-    float[] samples = new float[NUM_SAMPLES];
-    Random rand = new();
-    for (int i = 0; i < NUM_SAMPLES; i++) {
-      samples[i] = rand.NextSingle() * 2.0f - 1.0f;
+
+    // create a new track and let the user record microphone audio into it.
+    private void menuGenRecord_Click(object sender, EventArgs e)
+    {
+        Track newTrack = new(new float[0]);
+        CreateTrackPanel(newTrack);
+        trackManager.AddTrack(newTrack);
+        UpdateSizes();
+        newTrack.PanDrawSamples.Invalidate();
+
+        FrmGenRecord frm = new();
+        frm.SetSound(trackManager.SelectedTrack);
+        if (frm.ShowDialog() == DialogResult.Cancel)
+        {
+            trackManager.RemTrack(newTrack);
+        }
     }
-    Track newTrack = new(samples);
-    CreateTrackPanel(newTrack);
-    trackManager.AddTrack(newTrack);
-    UpdateSizes();
-    newTrack.PanDrawSamples.Invalidate();
-  }
-  // generate slowly varying random values for a smoother noise waveform.
-  private void menuGenGradientNoise_Click(object sender, EventArgs e) {
-    const int NUM_SAMPLES = 250_000;
-    float[] samples = new float[NUM_SAMPLES];
-    Random rand = new();
-    float cur = 0;
-    float inc = 0.005f;
-    int dir = +1;
-    for (int i = 0; i < NUM_SAMPLES; i++) {
-      cur += (inc * dir);
-      if (rand.NextSingle() < 0.5f) {
-        dir *= -1;
-      }
-      if (cur > 0.9f) {
-        dir = -1;
-      }
-      if (cur < -0.9f) {
-        dir = +1;
-      }
-      samples[i] = cur;
+    // generate a track containing randomized white-noise samples.
+    private void menuGenNoise_Click(object sender, EventArgs e)
+    {
+        const int NUM_SAMPLES = 100_000;
+        float[] samples = new float[NUM_SAMPLES];
+        Random rand = new();
+        for (int i = 0; i < NUM_SAMPLES; i++)
+        {
+            samples[i] = rand.NextSingle() * 2.0f - 1.0f;
+        }
+        Track newTrack = new(samples);
+        CreateTrackPanel(newTrack);
+        trackManager.AddTrack(newTrack);
+        UpdateSizes();
+        newTrack.PanDrawSamples.Invalidate();
     }
-    Track newTrack = new(samples);
-    CreateTrackPanel(newTrack);
-    trackManager.AddTrack(newTrack);
-    UpdateSizes();
-    newTrack.PanDrawSamples.Invalidate();
-  }
+    // generate slowly varying random values for a smoother noise waveform.
+    private void menuGenGradientNoise_Click(object sender, EventArgs e)
+    {
+        const int NUM_SAMPLES = 250_000;
+        float[] samples = new float[NUM_SAMPLES];
+        Random rand = new();
+        float cur = 0;
+        float inc = 0.005f;
+        int dir = +1;
+        for (int i = 0; i < NUM_SAMPLES; i++)
+        {
+            cur += (inc * dir);
+            if (rand.NextSingle() < 0.5f)
+            {
+                dir *= -1;
+            }
+            if (cur > 0.9f)
+            {
+                dir = -1;
+            }
+            if (cur < -0.9f)
+            {
+                dir = +1;
+            }
+            samples[i] = cur;
+        }
+        Track newTrack = new(samples);
+        CreateTrackPanel(newTrack);
+        trackManager.AddTrack(newTrack);
+        UpdateSizes();
+        newTrack.PanDrawSamples.Invalidate();
+    }
 
     // synchronize the play button, playhead, and slider with playback state.
     private void tmrUpdatePlaybackState_Tick(object sender, EventArgs e)
@@ -262,68 +319,77 @@ public partial class FrmMain : Form {
     }
 
     // update waveform zoom when the timescale slider moves.
-    private void trkDrawTimescale_Scroll(object sender, EventArgs e) {
-    trackManager.DrawTimescale = trkDrawTimescale.Maximum - trkDrawTimescale.Value;
-    trackManager.RedrawAll();
-  }
-
-  // helper methods
-  // create a clickable and paintable panel for a newly added audio track.
-  private Panel CreateTrackPanel(Track track) {
-    Panel pan = new() {
-      BackColor = Settings.Color.TrackBg_Unselected,
-      Width = panTracks.Width,
-      Left = 0,
-      Top = 0,
-    };
-    // a single click selects the track for keyboard and editing commands.
-    pan.Click += (sender, e) => {
-      trackManager.SelectTrack(track);
-    };
-    // double-click to enable or disable the track without removing it.
-    pan.DoubleClick += (sender, e) => {
-      track.ToggleDisabled();
-      track.PanDrawSamples.Invalidate();
-    };
-    // delegate waveform rendering to the track object.
-    pan.Paint += (sender, e) => {
-      track.DrawSamples(e.Graphics, trackManager.DrawTimescale);
-    };
-    panTracks.Controls.Add(pan);
-    track.LinkPanels(pan, panTracks);
-    trackManager.SelectTrack(track);
-
-    return pan;
-  }
-
-  // arrange track panels and adjust the scrubber width after layout changes.
-  private void UpdateSizes() {
-    const int PADDING = 15;
-
-    panTracks.Left = PADDING;
-    panTracks.Width = ClientSize.Width - (PADDING * 2);
-
-    if (trkScrubber != null) {
-        trkScrubber.Left = panTracks.Left;
-        trkScrubber.Width = panTracks.Width;
-        trkScrubber.Maximum = panTracks.Width;
+    private void trkDrawTimescale_Scroll(object sender, EventArgs e)
+    {
+        trackManager.DrawTimescale = trkDrawTimescale.Maximum - trkDrawTimescale.Value;
+        trackManager.RedrawAll();
     }
 
-    int top = 0;
-    foreach (Track track in trackManager.Tracks) {
-      track.PanDrawSamples.Left = 0;
-      track.PanDrawSamples.Width = panTracks.Width;
-      track.PanDrawSamples.Height = (panTracks.Height / trackManager.Tracks.Count) - 1;
-      track.PanDrawSamples.Top = top;
-      track.PanDrawSamples.Invalidate();
-      top += track.PanDrawSamples.Height;
+    // helper methods
+    // create a clickable and paintable panel for a newly added audio track.
+    private Panel CreateTrackPanel(Track track)
+    {
+        Panel pan = new()
+        {
+            BackColor = Settings.Color.TrackBg_Unselected,
+            Width = panTracks.Width,
+            Left = 0,
+            Top = 0,
+        };
+        // a single click selects the track for keyboard and editing commands.
+        pan.Click += (sender, e) =>
+        {
+            trackManager.SelectTrack(track);
+        };
+        // double-click to enable or disable the track without removing it.
+        pan.DoubleClick += (sender, e) =>
+        {
+            track.ToggleDisabled();
+            track.PanDrawSamples.Invalidate();
+        };
+        // delegate waveform rendering to the track object.
+        pan.Paint += (sender, e) =>
+        {
+            track.DrawSamples(e.Graphics, trackManager.DrawTimescale);
+        };
+        panTracks.Controls.Add(pan);
+        track.LinkPanels(pan, panTracks);
+        trackManager.SelectTrack(track);
+
+        return pan;
     }
-    trkDrawTimescale.Width = panTracks.Width;
-    trkDrawTimescale.Left = PADDING;
-    lblPlayhead.Left = 0;
-    lblPlayhead.Height = panTracks.Height;
-    lblPlayhead.BringToFront();
-  }
+
+    // arrange track panels and adjust the scrubber width after layout changes.
+    private void UpdateSizes()
+    {
+        const int PADDING = 15;
+
+        panTracks.Left = PADDING;
+        panTracks.Width = ClientSize.Width - (PADDING * 2);
+
+        if (trkScrubber != null)
+        {
+            trkScrubber.Left = panTracks.Left;
+            trkScrubber.Width = panTracks.Width;
+            trkScrubber.Maximum = panTracks.Width;
+        }
+
+        int top = 0;
+        foreach (Track track in trackManager.Tracks)
+        {
+            track.PanDrawSamples.Left = 0;
+            track.PanDrawSamples.Width = panTracks.Width;
+            track.PanDrawSamples.Height = (panTracks.Height / trackManager.Tracks.Count) - 1;
+            track.PanDrawSamples.Top = top;
+            track.PanDrawSamples.Invalidate();
+            top += track.PanDrawSamples.Height;
+        }
+        trkDrawTimescale.Width = panTracks.Width;
+        trkDrawTimescale.Left = PADDING;
+        lblPlayhead.Left = 0;
+        lblPlayhead.Height = panTracks.Height;
+        lblPlayhead.BringToFront();
+    }
 
     // the scrubber lets users select a horizontal playback starting position.
     private TrackBar trkScrubber;
