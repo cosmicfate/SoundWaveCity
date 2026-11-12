@@ -274,8 +274,8 @@ public class Track : IDisposable
     // convert the horizontal panel position to a sample position in the track's timeline. 
     public int SamplePositionAt(int panelX)
     {
-        long position = (long)Math.max(0, panelX) * Math.Max(1, drawTimescale); // convert to sample position
-        return (int)Math.min(int.MaxValue, position); // clamp to int range)
+        long position = (long)Math.Max(0, panelX) * Math.Max(1, drawTimescale); // convert to sample position
+        return (int)Math.Min(int.MaxValue, position); // clamp to int range)
     }
 
     public bool CanIPlaceClip(Clip clip, int startSample)
@@ -310,7 +310,7 @@ public class Track : IDisposable
     {
         if (clip is null || !CanIPlaceClip(clip, startSample)) return false; // clip is null or cannot be placed at the specified position
         int insertIndex = clips.FindIndex(c => c.StartSample > startSample);
-        if (insertIndex == -1) clips.Add(clip) // add to the end if no clip starts after the specified position
+        if (insertIndex == -1) clips.Add(clip); // add to the end if no clip starts after the specified position
         else clips.Insert(insertIndex, clip); // insert before the first clip that starts after the specified position
         SelectedClip = clip; // select the newly attached clip
         return true;

@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
@@ -9,12 +10,15 @@ namespace MediocreSoundDesigner;
 public sealed class TimelineRuler : Control
 {
     // seconds currently represented by the full width of the ruler.
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public double VisibleSeconds { get; set; }
 
     // the playhead uses the same horizontal pixel position as the track panels.
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public int PlayheadX { get; set; }
 
     // the playhead color follows the appearance settings.
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public Color MarkerColor { get; set; } = Color.IndianRed;
 
     private readonly Font headingFont = new("Segoe UI", 8f, FontStyle.Bold);

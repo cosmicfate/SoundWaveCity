@@ -1,5 +1,5 @@
 ﻿using NAudio.Wave;
-using MediocreSoundDesigner.code;
+using MediocreSoundDesigner.Code;
 
 namespace MediocreSoundDesigner; 
 
@@ -52,7 +52,7 @@ public class TrackManager {
             return false;
         }
 
-        if (State == PlaybackState.playing)
+        if (State == PlaybackState.Playing)
         {
             errorMessage = "Cannot move clips while playback is active. Please pause playback first.";
             return false;
@@ -81,7 +81,11 @@ public class TrackManager {
             return false; // can't move it
         }
         // remove from source track
-        source.Clips.Remove(clip);
+        if (!source.detachClip(clip))
+        {
+            errorMessage = "Failed to remove the clip from the source track.";
+            return false;
+        }
         // add to target track
         if (!target.AttachClip(clip, startSample))
         {
