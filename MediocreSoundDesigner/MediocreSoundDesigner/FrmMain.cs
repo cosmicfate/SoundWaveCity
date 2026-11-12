@@ -341,6 +341,26 @@ public partial class FrmMain : Form
         {
             trackManager.SelectTrack(track);
         };
+        pan.MouseClick += (sender, e) =>
+        {
+            // MouseClick reports the mouse position
+            // clicking a track does two more things:
+            //      1. moves the timeline head to the clicked position
+            //      2. selects the clip under the mouse, if there is one
+
+            // track panels sit at Left = 0 inside panTracks. the scrubber's range is 0..panTracks.Width
+            // Math.Clamp allegedly keeps the value inside the range that TrackBar accepts
+            scrubbedXPosition = Math.Clamp(e.X, trkScrubber.Minimum, trkScrubber.Maximum);
+
+            // moves scrubber thumb and playhead line to the clicked point
+            // as a plus this also sets where playback starts (W rizz)
+            trkScrubber.Value = scrubbedXPosition;
+            lblPlayhead.Left = scrubbedXPosition;
+
+            // selects the clicked clip and then repaints the outline
+            track.SelectClipAt(e.X);
+            track.PanDrawSamples.Invalidate();
+        };
         // double-click to enable or disable the track without removing it.
         pan.DoubleClick += (sender, e) =>
         {
