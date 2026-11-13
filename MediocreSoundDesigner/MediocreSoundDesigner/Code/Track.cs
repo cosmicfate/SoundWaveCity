@@ -1,5 +1,6 @@
 ﻿using MediocreSoundDesigner.Code;
 using NAudio.Wave;
+using System.Configuration;
 using System.Drawing.Drawing2D;
 
 namespace MediocreSoundDesigner;
@@ -61,18 +62,12 @@ public class Track : IDisposable
 
     // ctor
 
-    public Track(string file)
+    // creates an empty track (no clips). imported files are loaded with LoadClip
+    // and placed on a track with AttachClip, so the audio is a clip ON the track, not the track itself.
+    public Track()
     {
-        float[] fileSamples = AudioImport.Load(file);
-
-        // create the initial clip from the converted samples
-        clips.Add(new Clip(fileSamples, 0));
-        SelectedClip = clips[0];
-
-        this.file = file;
-        this.duration = TimeSpan.FromSeconds(
-            fileSamples.Length / (double)AudioImport.SampleRate);
-
+        this.file = "";
+        this.duration = TimeSpan.Zero;
         this.offset = 0;
         this.timeScale = 1.0f;
         this.Volume = 1.0f;
@@ -80,9 +75,12 @@ public class Track : IDisposable
         this.bits = 32;
         this.channels = 1;
         this.sampleRate = AudioImport.SampleRate;
-
         IsDisabled = false;
     }
+
+    // reads a whole audio file into a clip that isn't on any track yet.
+    // AudioImport converts every file to mono at AudioImport.SampleRate, so the clip fits on any track.
+    public static Clip LoadClip(string file) => new(AudioImport.Load(file), 0);
 
     public Track(float[] samples)
     {
@@ -321,6 +319,7 @@ public class Track : IDisposable
     internal bool AttachClip(Clip clip, int startSample)
     {
         if (clip is null || !CanIPlaceClip(clip, startSample)) return false; // clip is null or cannot be placed at the specified position
+        clip.StartSample = startSample; // actually move the clip to the position that was just checked
         int insertIndex = clips.FindIndex(c => c.StartSample > startSample);
         if (insertIndex == -1) clips.Add(clip); // add to the end if no clip starts after the specified position
         else clips.Insert(insertIndex, clip); // insert before the first clip that starts after the specified position
@@ -439,8 +438,8 @@ public class Track : IDisposable
         float heightAdj = height / 2;       
 
         using Pen samplePen = new(IsDisabled ? Settings.Color.TrackSamples_Disabled : Settings.Color.TrackSamples_Enabled);
-        using Pen edgePen = new(Settings.Color.WinBg);
-        using Pen selectedPen = new(Settings.Color.TrackSamples_Disabled) { DashStyle = DashStyle.Dash };
+        using Pen edgePen = new(Settings.Color.TrackSamples_Disabled, 2f);
+        using Pen selectedPen = new(Settings.Color.ClipSelectionOutline, 2f) { DashStyle = DashStyle.Solid };
 
         foreach (Clip clip in clips)
         {
@@ -461,15 +460,13 @@ public class Track : IDisposable
                 g.DrawLines(samplePen, points.ToArray());
             }
 
-            if (clips.Count > 1)
-            {
-                g.DrawLine(edgePen, startX, 0, startX, height);
-                g.DrawLine(edgePen, endX, 0, endX, height);
+            // edges are drawn even for each clip to distinguish them
+            g.DrawLine(edgePen, startX, 0, startX, height);
+            g.DrawLine(edgePen, endX, 0, endX, height);
 
-                if (clip == SelectedClip)
-                {
-                    g.DrawRectangle(selectedPen, startX, 0, endX - startX, height - 1);
-                }
+            if (clip == SelectedClip)
+            {
+                g.DrawRectangle(selectedPen, startX, 0, endX - startX, height - 1);
             }
         }
     }

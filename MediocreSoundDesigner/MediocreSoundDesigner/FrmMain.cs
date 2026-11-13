@@ -87,7 +87,9 @@ public partial class FrmMain : Form
             }
             else if (keyData == Keys.Delete)
             {
-                if (selectedTrack.SelectedClip is not null & selectedTrack.Clips.Count != 1)
+                // a selected clip is deleted on its own and the track remains, even if that was its only clip.
+                // with no clip selected, Delete removes the track.
+                if (selectedTrack.SelectedClip is not null)
                 {
                     if (MessageBox.Show("This will delete the selected CLIP. This is NOT undoable!", "Are You Sure?", MessageBoxButtons.YesNo, MessageBoxIcon.Exclamation) == DialogResult.Yes)
                     {
@@ -144,10 +146,13 @@ public partial class FrmMain : Form
         ofdLoadFile.DefaultExt = "wav";
         if (ofdLoadFile.ShowDialog() == DialogResult.OK)
         {
-            Track newTrack = new(ofdLoadFile.FileName);
+            // every imported file gets its own new track, and the file is a clip on that track.
+            var clip = Track.LoadClip(ofdLoadFile.FileName);
+            Track newTrack = new();
             CreateTrackPanel(newTrack);
             trackManager.AddTrack(newTrack);
             UpdateSizes();
+            newTrack.AttachClip(clip, 0); // the clip always starts at the beginning of its new track
             newTrack.PanDrawSamples.Invalidate();
         }
     }
