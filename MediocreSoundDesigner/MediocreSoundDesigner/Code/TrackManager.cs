@@ -9,6 +9,8 @@ public class TrackManager {
   private Panel panContainer;
   public UndoMan UndoManager { get; } = new();
 
+  public event Action TracksChanged;
+
   public List<Track> Tracks { get; private set; }
   public Track SelectedTrack { get; private set; }
   public int DrawTimescale { get; set; }
@@ -30,13 +32,22 @@ public class TrackManager {
         }
     }
 
-	public void RemTrack(Track track) {
-            Tracks.Remove(track);
+    public void RemTrack(Track track, bool recordUndo = true)
+    {
+        int index = Tracks.IndexOf(track);
+        if (index >= 0)
+        {
+            Tracks.RemoveAt(index);
+            if (recordUndo)
+            {
+                UndoManager.Record(new TrackListAction(this, panContainer, track, index, wasAdded: false));
+            }
             // if removed track was selected, deselect to avoid a reference to it
             if (SelectedTrack == track)
             {
                 SelectedTrack = null;
             }
+        }
     }
 
 	public void SelectTrack(Track track) {
@@ -233,6 +244,7 @@ public class TrackManager {
         if (!UndoManager.CanUndo) return;
         UndoManager.Undo();
         RedrawAll();
+        TracksChanged?.Invoke();
     }
 
 }

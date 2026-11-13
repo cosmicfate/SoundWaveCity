@@ -32,6 +32,9 @@ public partial class FrmMain : Form
         UpdateSizes();
         ApplySettings();
         SetupScrubber(); // initialize the scrubber
+        trackManager.TracksChanged += () => {
+            UpdateSizes();
+        };
     }
     // refresh visible editor colors from the shared application palette.
     private void ApplySettings()
@@ -511,7 +514,6 @@ public partial class FrmMain : Form
             trackManager.PlayAllFrom(scrubbedXPosition);
         }
     }
-
     private void FrmMain_Load(object sender, EventArgs e)
     {
 

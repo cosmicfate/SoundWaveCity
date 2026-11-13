@@ -75,6 +75,7 @@ public class TrackListAction : IUndoableAction
     {
         if (wasAdded)
         {
+            trackManager.RemTrack(track, recordUndo: false);
             if (track.PanDrawSamples is not null)
             {
                 panContainer.Controls.Remove(track.PanDrawSamples);
@@ -87,6 +88,7 @@ public class TrackListAction : IUndoableAction
             if (track.PanDrawSamples is not null && !panContainer.Controls.Contains(track.PanDrawSamples))
             {
                 panContainer.Controls.Add(track.PanDrawSamples);
+                track.PanDrawSamples.Invalidate();
             }
             trackManager.SelectTrack(track);
         }
