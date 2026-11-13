@@ -135,38 +135,39 @@
             // 
             // menuEdit
             // 
-            menuEdit.DropDownItems.AddRange(new ToolStripItem[] { menuItemCopy, menuItemCut, menuItemPaste, menuItemDelete, toolStripSeparator1, menuEditFlip, menuEditReverse, menuEditVolume, menuEditEliminateSilence });
+            menuEdit.DropDownItems.AddRange(new ToolStripItem[] { menuEditFlip, menuEditReverse, menuEditVolume, menuEditEliminateSilence });
+            // menuItemCopy, menuItemCut, menuItemPaste, menuItemDelete, toolStripSeparator1, 
             menuEdit.Name = "menuEdit";
             menuEdit.Size = new Size(39, 20);
             menuEdit.Text = "E&dit";
             // 
             // menuItemCopy
             // 
-            menuItemCopy.Name = "menuItemCopy";
-            menuItemCopy.Size = new Size(180, 22);
-            menuItemCopy.Text = "Copy          Ctrl+C";
-            menuItemCopy.Click += menuEditCopy_Click;
+            //menuItemCopy.Name = "menuItemCopy";
+            //menuItemCopy.Size = new Size(180, 22);
+            //menuItemCopy.Text = "Copy          Ctrl+C";
+            //menuItemCopy.Click += menuEditCopy_Click;
             // 
             // menuItemCut
             // 
-            menuItemCut.Name = "menuItemCut";
-            menuItemCut.Size = new Size(180, 22);
-            menuItemCut.Text = "Cut             Ctrl+X";
-            menuItemCut.Click += menuEditCut_Click;
+            //menuItemCut.Name = "menuItemCut";
+            //menuItemCut.Size = new Size(180, 22);
+            //menuItemCut.Text = "Cut             Ctrl+X";
+            //menuItemCut.Click += menuEditCut_Click;
             // 
             // menuItemPaste
             // 
-            menuItemPaste.Name = "menuItemPaste";
-            menuItemPaste.Size = new Size(180, 22);
-            menuItemPaste.Text = "Paste          Ctrl+V";
-            menuItemPaste.Click += menuEditPaste_Click;
+            //menuItemPaste.Name = "menuItemPaste";
+            //menuItemPaste.Size = new Size(180, 22);
+            //menuItemPaste.Text = "Paste          Ctrl+V";
+            //menuItemPaste.Click += menuEditPaste_Click;
             // 
             // menuItemDelete
             // 
-            menuItemDelete.Name = "menuItemDelete";
-            menuItemDelete.Size = new Size(180, 22);
-            menuItemDelete.Text = "Delete         Del";
-            menuItemDelete.Click += menuEditDelete_Click;
+            //menuItemDelete.Name = "menuItemDelete";
+            //menuItemDelete.Size = new Size(180, 22);
+            //menuItemDelete.Text = "Delete         Del";
+            //menuItemDelete.Click += menuEditDelete_Click;
             // 
             // toolStripSeparator1
             // 

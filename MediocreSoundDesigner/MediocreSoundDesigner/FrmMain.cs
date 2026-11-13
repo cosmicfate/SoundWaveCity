@@ -556,19 +556,19 @@ public partial class FrmMain : Form
         }
     }
 
-    private void menuEditCopy_Click(object sender, EventArgs e) => trackManager.CopySelectedClip();
+    //private void menuEditCopy_Click(object sender, EventArgs e) => trackManager.CopySelectedClip();
 
-    private void menuEditCut_Click(object sender, EventArgs e) => trackManager.CutSelectedClip();
+    //private void menuEditCut_Click(object sender, EventArgs e) => trackManager.CutSelectedClip();
 
-    private void menuEditPaste_Click(object sender, EventArgs e)
-    {
-        if (!trackManager.PasteClip(scrubbedXPosition, out string error))
-        {
-            MessageBox.Show(error, "Paste Failed", MessageBoxButtons.OK, MessageBoxIcon.Information);
-        }
-    }
+    //private void menuEditPaste_Click(object sender, EventArgs e)
+    //{
+    //    if (!trackManager.PasteClip(scrubbedXPosition, out string error))
+    //    {
+    //        MessageBox.Show(error, "Paste Failed", MessageBoxButtons.OK, MessageBoxIcon.Information);
+    //    }
+    //}
 
-    private void menuEditDelete_Click(object sender, EventArgs e) => DeleteSelectedClip(trackManager.SelectedTrack);
+    //private void menuEditDelete_Click(object sender, EventArgs e) => DeleteSelectedClip(trackManager.SelectedTrack);
 
     private void FrmMain_Load(object sender, EventArgs e)
     {
