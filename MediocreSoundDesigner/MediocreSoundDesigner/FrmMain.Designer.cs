@@ -40,6 +40,11 @@
             menuFileSave = new ToolStripMenuItem();
             menuFileSettings = new ToolStripMenuItem();
             menuEdit = new ToolStripMenuItem();
+            menuItemCopy = new ToolStripMenuItem();
+            menuItemCut = new ToolStripMenuItem();
+            menuItemPaste = new ToolStripMenuItem();
+            menuItemDelete = new ToolStripMenuItem();
+            toolStripSeparator1 = new ToolStripSeparator();
             menuEditFlip = new ToolStripMenuItem();
             menuEditReverse = new ToolStripMenuItem();
             menuEditVolume = new ToolStripMenuItem();
@@ -130,36 +135,69 @@
             // 
             // menuEdit
             // 
-            menuEdit.DropDownItems.AddRange(new ToolStripItem[] { menuEditFlip, menuEditReverse, menuEditVolume, menuEditEliminateSilence });
+            menuEdit.DropDownItems.AddRange(new ToolStripItem[] { menuItemCopy, menuItemCut, menuItemPaste, menuItemDelete, toolStripSeparator1, menuEditFlip, menuEditReverse, menuEditVolume, menuEditEliminateSilence });
             menuEdit.Name = "menuEdit";
             menuEdit.Size = new Size(39, 20);
             menuEdit.Text = "E&dit";
             // 
+            // menuItemCopy
+            // 
+            menuItemCopy.Name = "menuItemCopy";
+            menuItemCopy.Size = new Size(180, 22);
+            menuItemCopy.Text = "Copy          Ctrl+C";
+            menuItemCopy.Click += menuEditCopy_Click;
+            // 
+            // menuItemCut
+            // 
+            menuItemCut.Name = "menuItemCut";
+            menuItemCut.Size = new Size(180, 22);
+            menuItemCut.Text = "Cut             Ctrl+X";
+            menuItemCut.Click += menuEditCut_Click;
+            // 
+            // menuItemPaste
+            // 
+            menuItemPaste.Name = "menuItemPaste";
+            menuItemPaste.Size = new Size(180, 22);
+            menuItemPaste.Text = "Paste          Ctrl+V";
+            menuItemPaste.Click += menuEditPaste_Click;
+            // 
+            // menuItemDelete
+            // 
+            menuItemDelete.Name = "menuItemDelete";
+            menuItemDelete.Size = new Size(180, 22);
+            menuItemDelete.Text = "Delete         Del";
+            menuItemDelete.Click += menuEditDelete_Click;
+            // 
+            // toolStripSeparator1
+            // 
+            toolStripSeparator1.Name = "toolStripSeparator1";
+            toolStripSeparator1.Size = new Size(177, 6);
+            // 
             // menuEditFlip
             // 
             menuEditFlip.Name = "menuEditFlip";
-            menuEditFlip.Size = new Size(172, 22);
+            menuEditFlip.Size = new Size(180, 22);
             menuEditFlip.Text = "Flip";
             menuEditFlip.Click += menuEditFlip_Click;
             // 
             // menuEditReverse
             // 
             menuEditReverse.Name = "menuEditReverse";
-            menuEditReverse.Size = new Size(172, 22);
+            menuEditReverse.Size = new Size(180, 22);
             menuEditReverse.Text = "Reverse";
             menuEditReverse.Click += menuEditReverse_Click;
             // 
             // menuEditVolume
             // 
             menuEditVolume.Name = "menuEditVolume";
-            menuEditVolume.Size = new Size(172, 22);
+            menuEditVolume.Size = new Size(180, 22);
             menuEditVolume.Text = "Alter Volume...";
             menuEditVolume.Click += menuEditVolume_Click;
             // 
             // menuEditEliminateSilence
             // 
             menuEditEliminateSilence.Name = "menuEditEliminateSilence";
-            menuEditEliminateSilence.Size = new Size(172, 22);
+            menuEditEliminateSilence.Size = new Size(180, 22);
             menuEditEliminateSilence.Text = "Eliminate Silence...";
             menuEditEliminateSilence.Click += menuEditEliminateSilence_Click;
             // 
@@ -278,5 +316,10 @@
     private Label lblPlayhead;
     private ToolStripMenuItem menuGenRecord;
     private ToolStripMenuItem menuFileSettings;
-  }
+        private ToolStripMenuItem menuItemCopy;
+        private ToolStripMenuItem menuItemCut;
+        private ToolStripMenuItem menuItemPaste;
+        private ToolStripMenuItem menuItemDelete;
+        private ToolStripSeparator toolStripSeparator1;
+    }
 }
