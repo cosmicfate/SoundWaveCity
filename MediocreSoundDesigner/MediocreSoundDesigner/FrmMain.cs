@@ -15,6 +15,7 @@ public partial class FrmMain : Form
         InitializeComponent();
         Setup();
         InitializeTimelineZoom();
+        InitializeClipContextMenu();
         AddAppearanceMenu();
         AddQuickAccessToolbar();
         SizeChanged += FrmMain_SizeChanged;
@@ -91,22 +92,11 @@ public partial class FrmMain : Form
                 // with no clip selected, Delete removes the track.
                 if (selectedTrack.SelectedClip is not null)
                 {
-                    if (MessageBox.Show("This will delete the selected CLIP. This is NOT undoable!", "Are You Sure?", MessageBoxButtons.YesNo, MessageBoxIcon.Exclamation) == DialogResult.Yes)
-                    {
-                        selectedTrack.RemoveSelectedClip();
-                        selectedTrack.PanDrawSamples.Invalidate();
-                    }
+                    DeleteSelectedClip(selectedTrack);
                 }
                 else
                 {
-                    if (MessageBox.Show("This will delete the selected TRACK. This is NOT undoable!", "Are You Sure?", MessageBoxButtons.YesNo, MessageBoxIcon.Exclamation) == DialogResult.Yes)
-                    {
-                        panTracks.Controls.Remove(selectedTrack.PanDrawSamples);
-                        selectedTrack.PanDrawSamples.Dispose();
-                        selectedTrack.Dispose();
-                        trackManager.RemTrack(selectedTrack);
-                        UpdateSizes();
-                    }
+                    DeleteTrack(selectedTrack);
                 }
                 return true;
             }
@@ -117,6 +107,33 @@ public partial class FrmMain : Form
             }
         }
         return base.ProcessCmdKey(ref msg, keyData);
+    }
+
+    // asks for confirmation, then deletes the track's selected clip. the track itself remains.
+    // shared by the Delete key and the right-click clip menu.
+    private void DeleteSelectedClip(Track track)
+    {
+        if (track?.SelectedClip is null) return;
+        if (MessageBox.Show("This will delete the selected CLIP. This is NOT undoable!", "Are You Sure?", MessageBoxButtons.YesNo, MessageBoxIcon.Exclamation) == DialogResult.Yes)
+        {
+            track.RemoveSelectedClip();
+            track.PanDrawSamples.Invalidate();
+        }
+    }
+
+    // asks for confirmation, then deletes the whole track along with every clip on it.
+    // shared by the Delete key and the right-click track menu.
+    private void DeleteTrack(Track track)
+    {
+        if (track is null) return;
+        if (MessageBox.Show("This will delete the selected TRACK. This is NOT undoable!", "Are You Sure?", MessageBoxButtons.YesNo, MessageBoxIcon.Exclamation) == DialogResult.Yes)
+        {
+            panTracks.Controls.Remove(track.PanDrawSamples);
+            track.PanDrawSamples.Dispose();
+            track.Dispose();
+            trackManager.RemTrack(track);
+            UpdateSizes();
+        }
     }
 
     // resize the timeline and track panels when the editor window changes size.
@@ -372,6 +389,12 @@ public partial class FrmMain : Form
             // selects the clicked clip and then repaints the outline
             track.SelectClipAt(e.X);
             track.PanDrawSamples.Invalidate();
+
+            // right-clicking a clip also opens the clip edit menu (ClipContextMenu)
+            if (e.Button == MouseButtons.Right)
+            {
+                ShowTrackContextMenu(track, pan, e.Location);
+            }
         };
         // double-click to enable or disable the track without removing it.
         pan.DoubleClick += (sender, e) =>
