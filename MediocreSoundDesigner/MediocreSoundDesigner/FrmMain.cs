@@ -14,7 +14,7 @@ public partial class FrmMain : Form
     {
         InitializeComponent();
         Setup();
-        InitalizeTrackInfo();
+        InitializeTrackInfoUI();
         InitializeTimelineZoom();
         InitializeClipContextMenu();
         AddAppearanceMenu();
@@ -32,7 +32,7 @@ public partial class FrmMain : Form
         UpdateSizes();
         ApplySettings();
         SetupScrubber();
-        RefreshTrackHeaderColor();
+        RefreshTrackHeaderColors();
         trackManager.TracksChanged += () => {
             UpdateSizes();
         };
@@ -45,7 +45,7 @@ public partial class FrmMain : Form
         panTracks.BackColor = Settings.Color.TrackBg_Unselected;
         lblPlayhead.BackColor = Settings.Color.Playline;
         trackManager.ApplySettings();
-        RefreshTrackHeaderColor();
+        RefreshTrackHeaderColors();
     }
 
     // let users revisit the same choices without resetting their setup
@@ -241,7 +241,7 @@ public partial class FrmMain : Form
             FrmEditVolume frm = new();
             frm.SetSound(trackManager.SelectedTrack);
             frm.ShowDialog();
-            RefreshTrackHeaderColor();
+            RefreshTrackHeaderColors();
         }
     }
     // open silence removal controls for the selected track.
@@ -436,7 +436,7 @@ public partial class FrmMain : Form
         {
             track.ToggleDisabled();
             track.PanDrawSamples.Invalidate();
-            RefreshTrackHeaderColor();
+            RefreshTrackHeaderColors();
         };
         // delegate waveform rendering to the track object.
         pan.Paint += (sender, e) =>
@@ -458,10 +458,10 @@ public partial class FrmMain : Form
         const int PADDING = 15;
 
         panTracks.Left = PADDING;
-        panTracks.Width = Math.Max(1, MathClientSize.Width - (PADDING * 2));
+        panTracks.Width = Math.Max(1, ClientSize.Width - (PADDING * 2));
 
         int count = trackManager.Tracks.Count;
-        int rowHeight = Math.Clamp(panTracks.clientSize.Height / Math.Max(1, count) - 1 , 118, 220);
+        int rowHeight = Math.Clamp(panTracks.ClientSize.Height / Math.Max(1, count) - 1, 118, 220);
         panTracks.AutoScrollMinSize = new Size(0, count * rowHeight);
         int waveformWidth = Math.Max(1, panTracks.ClientSize.Width - TrackHeaderWidth - 4);
 
@@ -483,21 +483,14 @@ public partial class FrmMain : Form
             track.PanDrawSamples.Invalidate();
             //top += track.PanDrawSamples.Height;
         }
-        //trkDrawTimescale.Width = panTracks.Width;
-        //trkDrawTimescale.Left = PADDING;
-        //lblPlayhead.Left = 0;
-        //lblPlayhead.Height = panTracks.Height;
-        //lblPlayhead.BringToFront();
-        top += rowHeight;
+        // keeping controls aligned with the waveform row that they are in.
+        LayoutTrackHeaders();
+        trkDrawTimescale.Width = waveformWidth;
+        trkDrawTimescale.Left = panTracks.Left + TrackHeaderWidth;
+        lblPlayhead.Left = TrackHeaderWidth + scrubbedXPosition;
+        lblPlayhead.Height = Math.Max(panTracks.Height, rowHeight * count);
+        lblPlayhead.BringToFront();
     }
-
-    //keeping controls aligned with the waveform row that they are in
-    LayoutTrackHeader();
-    trkDrawTimescale.Width = waveFormWidth;
-    trkDrawTimescale.Left = panTracks.Left + TrackHeaderWidth;
-    lblPlayhead.Left = TrackHeaderWidth + scrubbedXPosition;
-    lblPlayhead.Height = Math.Max(panTracks.Height, rowHeight * count);
-    lblPlayhead.BringToFront();
 
     // the scrubber lets users select a horizontal playback starting position.
     private TrackBar trkScrubber;

@@ -15,7 +15,7 @@ public partial class FrmMain
     private double importedDuration;
     private bool positioningTimeline;
 
-    // call this once after setup() and the optional quick-access toolbar.
+    // initalize after setup adn track header creation.
     private void InitializeTimelineZoom()
     {
         defaultZoom = trkDrawTimescale.Value;
@@ -154,12 +154,13 @@ public partial class FrmMain
         positioningTimeline = true;
         try
         {
-            Control[] toolbar = Controls.Find("quickActions", false);
 
-            // position the ruler below the toolbar 
-            int top = toolbar.Length > 0 ? toolbar[0].Bottom + 8 : menu.Bottom + 36; // location of zoom buttons
-            int width = Math.Max(150, ClientSize.Width - 30);
-            ruler.Bounds = new Rectangle(15, top, width, 80);
+            // align the ruler to the wavefrom area
+            int top = menu.Bottom + 6;
+            int width = Math.Max(TrackHeaderWidth + 150, ClientSize.Width - 30);
+            ruler.Bounds = new Rectangle(15 + TrackHeaderWidth, top, Math.Max(150, width - TrackHeaderWidth), 80);
+            PositionTrackHeaderBand(top);
+
 
             // a single compact ruler replaces the two large visible sliders.
             int trackTop = ruler.Bottom + 8;
@@ -175,8 +176,8 @@ public partial class FrmMain
 
             // keep the invisible scrubber aligned with the same pixel range.
             trkScrubber.Minimum = 0;
-            trkScrubber.Maximum = width;
-            if (trkScrubber.Value > width) trkScrubber.Value = width;
+            trkScrubber.Maximum = Math.Max(1, panTracks.ClientSize.Width - TrackHeaderWidth);
+            if (trkScrubber.Value > trkScrubber.Maximum) trkScrubber.Value = trkScrubber.Maximum;
 
             zoomIn.Location = new Point(ruler.Width - 41, 7);
             zoomReset.Location = new Point(zoomIn.Left - 58, 7);
@@ -200,7 +201,7 @@ public partial class FrmMain
         int position = Math.Clamp(x, trkScrubber.Minimum, trkScrubber.Maximum);
         scrubbedXPosition = position;
         trkScrubber.Value = position;
-        lblPlayhead.Left = position;
+        lblPlayhead.Left = position + TrackHeaderWidth;
         ruler.PlayheadX = position;
         ruler.Invalidate();
     }
