@@ -96,7 +96,7 @@ public partial class FrmMain : Form
             }
             else if (keyData == Keys.Delete)
             {
-                // a selected clip is deleted on its own and the track remains, even if that was its only clip.
+                // a selected clip is deleted on its own. its track is only removed if that leaves it empty and other tracks exist.
                 // with no clip selected, Delete removes the track.
                 if (selectedTrack.SelectedClip is not null)
                 {
@@ -117,13 +117,19 @@ public partial class FrmMain : Form
         return base.ProcessCmdKey(ref msg, keyData);
     }
 
-    // asks for confirmation, then deletes the track's selected clip. the track itself remains.
+    // deletes the track's selected clip. the track is removed too if that leaves it empty and other tracks exist.
     // shared by the Delete key and the right-click clip menu.
     private void DeleteSelectedClip(Track track)
     {
         if (track?.SelectedClip is null) return;
             track.RemoveSelectedClip();
             track.PanDrawSamples.Invalidate();
+            // the track goes too if that was its last clip and other tracks exist.
+            // (a track emptied by dragging its clip away is left alone, so this only checks this track)
+            if (trackManager.RemoveTrackIfEmpty(track))
+            {
+                UpdateSizes();
+            }
     }
 
     // asks for confirmation, then deletes the whole track along with every clip on it.
@@ -168,14 +174,24 @@ public partial class FrmMain : Form
         ofdLoadFile.DefaultExt = "wav";
         if (ofdLoadFile.ShowDialog() == DialogResult.OK)
         {
-            // every imported file gets its own new track, and the file is a clip on that track.
+            // the file becomes a clip. it goes on the first track that has no clips,
+            // and a new track is only made when every existing track already holds audio.
             var clip = Track.LoadClip(ofdLoadFile.FileName);
-            Track newTrack = new();
-            CreateTrackPanel(newTrack);
-            trackManager.AddTrack(newTrack);
-            UpdateSizes();
-            newTrack.AttachClip(clip, 0); // the clip always starts at the beginning of its new track
-            newTrack.PanDrawSamples.Invalidate();
+            Track target = trackManager.Tracks.Find(t => t.Clips.Count == 0);
+            if (target is null)
+            {
+                target = new();
+                CreateTrackPanel(target);
+                trackManager.AddTrack(target);
+                UpdateSizes();
+            }
+            else
+            {
+                trackManager.RecordTrackSnapshot(target); // so undo takes the clip back off the track
+                trackManager.SelectTrack(target);
+            }
+            target.AttachClip(clip, 0); // the clip always starts at the beginning of its track
+            target.PanDrawSamples.Invalidate();
         }
     }
     // export the current audio mix through the track manager.

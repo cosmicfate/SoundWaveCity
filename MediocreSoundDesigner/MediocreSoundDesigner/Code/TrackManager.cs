@@ -39,6 +39,24 @@ public class TrackManager {
             }
     }
 
+    // removes the given track if it has no clips on it, but never the last remaining track.
+    // returns true if it was removed, so the form knows to lay the rows out again.
+    // the track and its panel are NOT disposed, because undo can put the track back.
+    public bool RemoveTrackIfEmpty(Track track)
+    {
+        if (track is null || track.Clips.Count > 0) return false;
+        if (Tracks.Count <= 1 || !Tracks.Contains(track)) return false; // always keep one track on screen
+
+        int index = Tracks.IndexOf(track);
+        if (track.PanDrawSamples is not null)
+        {
+            panContainer.Controls.Remove(track.PanDrawSamples);
+        }
+        RemTrack(track);
+        UndoManager.Record(new TrackListAction(this, panContainer, track, index, wasAdded: false));
+        return true;
+    }
+
 	public void SelectTrack(Track track) {
 		SelectedTrack = track;
     Tracks.ForEach(other => {
