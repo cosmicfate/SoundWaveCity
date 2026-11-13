@@ -1,11 +1,14 @@
 using MediocreSoundDesigner.Code;
 
 namespace MediocreSoundDesigner;
+
+// keeps track of actions that can be undone, and allows undoing them in reverse order.
 public interface IUndoableAction
 {
     void Undo();
 }
 
+// captures a full point-in-time copy of a track's clips, selection, volume, and mute state
 public class TrackSnapshotAction : IUndoableAction
 {
     private readonly Track track;
@@ -23,12 +26,15 @@ public class TrackSnapshotAction : IUndoableAction
         this.savedVolume = track.Volume;
         this.savedIsDisabled = track.IsDisabled;
     }
+
+    //restores the track to its previous state when this action was recorded
     public void Undo()
     {
         track.RestoreSnapshot(savedClips, selectedClipIndex, savedVolume, savedIsDisabled);
     }
 }
 
+// can gorup multiple undoable actions into a single setep
 public class CompositeAction : IUndoableAction
 {
     private readonly List<IUndoableAction> actions;
@@ -47,6 +53,7 @@ public class CompositeAction : IUndoableAction
     }
 }
 
+// records the addition or removal of a track int he track manager
 public class TrackListAction : IUndoableAction
 {
     private readonly TrackManager trackManager;
@@ -86,14 +93,19 @@ public class TrackListAction : IUndoableAction
     }
 }
 
+// manages the undo history stack and provides methods to record actions and undo them
 public class UndoMan
 {
     private readonly Stack<IUndoableAction> undoStack = new();
+
+    // cap the history so that it doesn't grow indefinitely and consume too much memory
     private const int MaxHistory = 30;
 
     public bool CanUndo => undoStack.Count > 0;
     public event Action HistoryChanged;
 
+
+    // if the action is reversible, record it in the undo history stack.  if the stack is full, remove the oldest action to make room for the new one
     public void Record(IUndoableAction action)
     {
         if (action is null) return;
@@ -112,6 +124,7 @@ public class UndoMan
         HistoryChanged?.Invoke();
     }
 
+    // pops and reverst the most recent action from the undo histroy stack
     public void Undo()
     {
         if (!CanUndo) return;
@@ -121,6 +134,7 @@ public class UndoMan
         HistoryChanged?.Invoke();
     }
 
+    // empies all saved undo history
     public void Clear()
     {
         undoStack.Clear();
