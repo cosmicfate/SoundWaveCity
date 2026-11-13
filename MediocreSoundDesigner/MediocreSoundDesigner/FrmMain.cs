@@ -200,10 +200,23 @@ public partial class FrmMain : Form
     // export the current audio mix through the track manager.
     private void menuFileSave_Click(object sender, EventArgs e)
     {
+        // STOLE THIS FROM JOE AND GRIFFIN HAHA
         sfdSaveFile.DefaultExt = "wav";
-        if (sfdSaveFile.ShowDialog() == DialogResult.OK)
+        sfdSaveFile.Filter = "WAV files (*.wav)|*.wav|MP3 files (*.mp3)|*.mp3|All files (*.*)|*.*";
+        sfdSaveFile.FileName = "NewAudio";
+        if (sfdSaveFile.ShowDialog(this) == DialogResult.OK)
         {
-            trackManager.SaveToFile(sfdSaveFile.FileName);
+            try
+            {
+                string filePath = sfdSaveFile.FileName;
+                trackManager.SaveToFile(filePath);
+                MessageBox.Show(this, $"Saved to {filePath}", "Save Succeed", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, $"There was an error during the save!\n{ex}", "Save Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
         }
     }
     // open the existing color settings dialog and refresh its changes.
