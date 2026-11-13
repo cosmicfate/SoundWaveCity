@@ -230,6 +230,9 @@ public class Track : IDisposable
     }
 
     // selects clip under the given panel X position. if there is no clip then selctedClip becomes null
+
+    public void DeselectClip() => SelectedClip = null;  // method to deselect currently selected clip, called when user selects empty space or a different clip
+
     public bool SelectClipAt(int panelX)
     {
         // ClipAt returns null for an empty spot, so this deselects in that case

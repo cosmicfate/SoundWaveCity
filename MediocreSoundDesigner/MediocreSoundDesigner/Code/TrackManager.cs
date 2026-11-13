@@ -34,9 +34,15 @@ public class TrackManager {
 
 	public void SelectTrack(Track track) {
 		SelectedTrack = track;
-    Tracks.ForEach(track => {
-      track.PanDrawSamples.BorderStyle = BorderStyle.None;
-      track.PanDrawSamples.BackColor = Settings.Color.TrackBg_Unselected;
+    Tracks.ForEach(other => {
+      other.PanDrawSamples.BorderStyle = BorderStyle.None;
+      other.PanDrawSamples.BackColor = Settings.Color.TrackBg_Unselected;
+      // each track remembers its own selected clip, so the other tracks have to let go of theirs.
+      // otherwise their clip keeps its selection outline after the user moves to this track.
+      if (other != track) {
+        other.DeselectClip();
+        other.PanDrawSamples.Invalidate();
+      }
     });
     track.PanDrawSamples.BorderStyle = BorderStyle.Fixed3D;
     track.PanDrawSamples.BackColor = Settings.Color.TrackBg_Selected;
@@ -117,8 +123,9 @@ public class TrackManager {
             }
         }
 
-        SelectTrack(source); // select the source track after moving the clip
+        SelectTrack(target); // select the track the clip now lives on, so the moved clip stays selected
         source.PanDrawSamples?.Invalidate(); // redraw the source track
+        target.PanDrawSamples?.Invalidate(); // redraw the target track
         return true; // :)
     }
 
