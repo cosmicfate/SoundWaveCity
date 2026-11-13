@@ -84,7 +84,7 @@ public class Track : IDisposable
         IsDisabled = false;
     }
 
-    public Track(float[] samples, int sampleRate = 44100, int channels = 1)
+    public Track(float[] samples)
     {
         clips.Add(new Clip(samples, 0));
         SelectedClip = clips[0];
@@ -96,7 +96,7 @@ public class Track : IDisposable
         this.Volume = 1.0f;
         this.pitch = 1.0f;
         this.bits = 32;
-        this.channels = channels;
+        this.channels = 1;
         this.sampleRate = AudioImport.SampleRate;
         IsDisabled = false;
     }
@@ -374,7 +374,9 @@ public class Track : IDisposable
     private void SaveToTempFile()
     {
         Directory.CreateDirectory(Path.GetDirectoryName(tempFilePath));
-        using var writer = new WaveFileWriter(tempFilePath, fileReader?.WaveFormat ?? new());
+        // the samples are mono floats at sampleRate, so the file has to be described that way.
+        WaveFormat format = WaveFormat.CreateIeeeFloatWaveFormat(sampleRate, channels);
+        using var writer = new WaveFileWriter(tempFilePath, format);
         // since 'samples' now only references the selectedClip, using output's length writes everything
         float[] output = GetAdjustedSamples();
         writer.WriteSamples(output, 0, output.Length);
