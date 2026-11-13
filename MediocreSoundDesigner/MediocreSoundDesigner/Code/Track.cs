@@ -63,28 +63,30 @@ public class Track : IDisposable
 
     public Track(string file)
     {
-        float[] fileSamples = AudioImport.Load(file);
-
-        // create the initial clip from the converted samples
+        fileReader = new AudioFileReader(file);
+        int sampleCount = (int)(fileReader.Length / 4);
+        // samples is read into local array now because now 'samples' needs a SelectedClip that doesn't exist yet
+        float[] fileSamples = new float[sampleCount];
+        int samplesRead = ((ISampleProvider)fileReader).Read(fileSamples);
+        if (samplesRead < sampleCount)
+        {
+            Array.Resize(ref fileSamples, samplesRead);
+        }
+        // whole file becomes one clip that starts at pos 0 and is selected
         clips.Add(new Clip(fileSamples, 0));
         SelectedClip = clips[0];
-
         this.file = file;
-        this.duration = TimeSpan.FromSeconds(
-            fileSamples.Length / (double)AudioImport.SampleRate);
-
+        this.duration = fileReader.TotalTime;
         this.offset = 0;
         this.timeScale = 1.0f;
         this.Volume = 1.0f;
         this.pitch = 1.0f;
-        this.bits = 32;
-        this.channels = 1;
-        this.sampleRate = AudioImport.SampleRate;
-
+        this.bits = fileReader.WaveFormat.BitsPerSample;
+        this.channels = fileReader.WaveFormat.Channels;
+        this.sampleRate = fileReader.WaveFormat.SampleRate;
         IsDisabled = false;
     }
-
-    public Track(float[] samples, int sampleRate = 44100, int channels = 1)
+    public Track(float[] samples)
     {
         clips.Add(new Clip(samples, 0));
         SelectedClip = clips[0];
@@ -96,8 +98,8 @@ public class Track : IDisposable
         this.Volume = 1.0f;
         this.pitch = 1.0f;
         this.bits = 32;
-        this.channels = channels;
-        this.sampleRate = AudioImport.SampleRate;
+        this.channels = 1;
+        this.sampleRate = 0;
         IsDisabled = false;
     }
     public void LinkPanels(Panel panDrawSamples, Panel panContainer)
