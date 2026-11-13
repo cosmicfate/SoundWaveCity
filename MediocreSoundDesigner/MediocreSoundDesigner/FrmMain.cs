@@ -70,6 +70,14 @@ public partial class FrmMain : Form
     // provide keyboard shortcuts for nudging or deleting the selected track.
     protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
     {
+        // undo keybind code that when Ctrl+Z is pressed, it calls the UndoLastAction method of the trackManager and updates the sizes of the tracks.
+        if (keyData == (Keys.Control | Keys.Z))
+        {
+            trackManager.UndoLastAction();
+            UpdateSizes();
+            return true;
+        }
+
         Track selectedTrack = trackManager.SelectedTrack;
         if (selectedTrack is not null)
         {
@@ -174,11 +182,13 @@ public partial class FrmMain : Form
     // invert the selected waveform vertically.
     private void menuEditFlip_Click(object sender, EventArgs e)
     {
+        trackManager.RecordTrackSnapshot(trackManager.SelectedTrack);
         trackManager.SelectedTrack?.Flip();
     }
     // reverse the order of samples in the selected track.
     private void menuEditReverse_Click(object sender, EventArgs e)
     {
+        trackManager.RecordTrackSnapshot(trackManager.SelectedTrack);
         trackManager.SelectedTrack?.Reverse();
     }
     // open the volume adjustment dialog for the selected track.
@@ -186,6 +196,7 @@ public partial class FrmMain : Form
     {
         if (trackManager.SelectedTrack is not null)
         {
+            trackManager.RecordTrackSnapshot(trackManager.SelectedTrack);
             FrmEditVolume frm = new();
             frm.SetSound(trackManager.SelectedTrack);
             frm.ShowDialog();
@@ -196,6 +207,7 @@ public partial class FrmMain : Form
     {
         if (trackManager.SelectedTrack is not null)
         {
+            trackManager.RecordTrackSnapshot(trackManager.SelectedTrack);
             FrmEditEliminateSilence frm = new();
             frm.SetSound(trackManager.SelectedTrack);
             frm.ShowDialog();
@@ -208,6 +220,7 @@ public partial class FrmMain : Form
         Track track = trackManager.SelectedTrack;
         if (track is null) return;
 
+        trackManager.RecordTrackSnapshot(trackManager.SelectedTrack);
         // Split the clip under the edit cursor (a pixel X position). Both halves
         // stay on this track, so there are no new panels or rows and UpdateSizes
         // isn't needed. SplitAt returns false if the cursor isn't inside a clip.
@@ -346,6 +359,7 @@ public partial class FrmMain : Form
         // a single click selects the track for keyboard and editing commands.
         pan.Click += (sender, e) =>
         {
+            trackManager.RecordTrackSnapshot(trackManager.SelectedTrack);
             trackManager.SelectTrack(track);
         };
         pan.MouseClick += (sender, e) =>

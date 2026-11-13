@@ -3,14 +3,14 @@ using MediocreSoundDesigner.Code;
 
 namespace MediocreSoundDesigner; 
 
-public UndoMan UndoMan { get; private set; } = new();
-
 public class TrackManager {
+
   private Track pseudoCombinedTrack;
   private Panel panContainer;
+  public UndoMan UndoManager { get; } = new();
 
   public List<Track> Tracks { get; private set; }
-	public Track SelectedTrack { get; private set; }
+  public Track SelectedTrack { get; private set; }
   public int DrawTimescale { get; set; }
   public PlaybackState State => pseudoCombinedTrack?.State ?? PlaybackState.Stopped;
 
@@ -20,18 +20,23 @@ public class TrackManager {
     pseudoCombinedTrack = null;
     this.panContainer = panContainer;
   }
-
-	public void AddTrack(Track track) {
-		Tracks.Add(track);
-	}
+    public void AddTrack(Track track, bool recordUndo = true)
+    {
+        Tracks.Add(track);
+        // undo code to add track to list and remove it if undo is called
+        if (recordUndo)
+        {
+            UndoManager.Record(new TrackListAction(this, panContainer, track, Tracks.Count - 1, wasAdded: true));
+        }
+    }
 
 	public void RemTrack(Track track) {
-		Tracks.Remove(track);
-        // if removed track was selected, deselect to avoid a reference to it
-        if (SelectedTrack == track)
-        {
-            SelectedTrack = null;
-        }
+            Tracks.Remove(track);
+            // if removed track was selected, deselect to avoid a reference to it
+            if (SelectedTrack == track)
+            {
+                SelectedTrack = null;
+            }
     }
 
 	public void SelectTrack(Track track) {
@@ -97,6 +102,11 @@ public class TrackManager {
         {
             return false; // can't move it
         }
+
+        // undo code to move clip from source track to target track, or reposition it within the same track
+        // captures a single snapshot for tracks that move in the same track or a cross-track move, capturing both tracks' states before the move
+        IUndoableAction moveUndo = ReferenceEquals(source, target) ? new TrackSnapshotAction(source) : new CompositeAction(new TrackSnapshotAction(source), new TrackSnapshotAction(target));
+
         // remove from source track
         if (!source.detachClip(clip))
         {
@@ -118,6 +128,9 @@ public class TrackManager {
                 return false;
             }
         }
+
+        // record the move action for undo
+        UndoManager.Record(moveUndo);
 
         SelectTrack(source); // select the source track after moving the clip
         source.PanDrawSamples?.Invalidate(); // redraw the source track
@@ -199,4 +212,20 @@ public class TrackManager {
     CombineTracks();
     pseudoCombinedTrack?.PlayFromPosition(xPos);
    }
+    // saves the current state of a track before a destructive edit is made
+    public void RecordTrackSnapshot(Track track)
+    {
+        if (track is not null)
+        {
+            UndoManager.Record(new TrackSnapshotAction(track));
+        }
+    }
+    // reverts the last action performed on the track manager, if any and redraws all tracks
+    public void UndoLastAction()
+    {
+        if (!UndoManager.CanUndo) return;
+        UndoManager.Undo();
+        RedrawAll();
+    }
+
 }
