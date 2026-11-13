@@ -27,10 +27,20 @@ public partial class FrmMain
         Image deleteIcon = SystemIcons.GetStockIcon(StockIconId.Delete, 16).ToBitmap();
 
         clipMenu.Items.Add(new ToolStripSeparator());
-        // reuse delete functions
-        clipMenu.Items.Add("Delete Clip", deleteIcon, (_, _) => DeleteSelectedClip(clipMenuTrack));
+        clipMenu.Items.Add("Cut", null, (_, _) => trackManager.CutSelectedClip());
+        clipMenu.Items.Add("Copy", null, (_, _) => trackManager.CopySelectedClip());
+        clipMenu.Items.Add(new ToolStripSeparator());
+        clipMenu.Items.Add("Delete", deleteIcon, (_, _) => DeleteSelectedClip(clipMenuTrack));
 
         trackMenu = new ContextMenuStrip();
+        trackMenu.Items.Add("Paste", null, (_, _) =>
+        {
+            if (!trackManager.PasteClip(scrubbedXPosition, out string error))
+            {
+                MessageBox.Show(error, "Paste Failed", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        });
+        trackMenu.Items.Add(new ToolStripSeparator());
         trackMenu.Items.Add("Delete Track", deleteIcon, (_, _) => DeleteTrack(clipMenuTrack));
 
         // the playhead line sits on top of the tracks, so it gets the right-click instead of

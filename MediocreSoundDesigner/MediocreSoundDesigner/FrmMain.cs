@@ -32,7 +32,8 @@ public partial class FrmMain : Form
         UpdateSizes();
         ApplySettings();
         SetupScrubber(); // initialize the scrubber
-        trackManager.TracksChanged += () => {
+        trackManager.TracksChanged += () =>
+        {
             UpdateSizes();
         };
     }
@@ -79,6 +80,30 @@ public partial class FrmMain : Form
         {
             trackManager.UndoLastAction();
             UpdateSizes();
+            return true;
+        }
+
+        // Copy the currently selected clip to the clipboard.
+        else if (keyData == (Keys.Control | Keys.C))
+        {
+            trackManager.CopySelectedClip();
+            return true;
+        }
+
+        // Cut the currently selected clip to the clipboard.
+        else if (keyData == (Keys.Control | Keys.X))
+        {
+            trackManager.CutSelectedClip();
+            return true;
+        }
+
+        // Paste the clipboard clip at the current scrubber position on the selected track.
+        else if (keyData == (Keys.Control | Keys.V))
+        {
+            if (!trackManager.PasteClip(scrubbedXPosition, out string error))
+            {
+                MessageBox.Show(error, "Paste Failed", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
             return true;
         }
 
@@ -543,6 +568,21 @@ public partial class FrmMain : Form
             trackManager.PlayAllFrom(scrubbedXPosition);
         }
     }
+
+    //private void menuEditCopy_Click(object sender, EventArgs e) => trackManager.CopySelectedClip();
+
+    //private void menuEditCut_Click(object sender, EventArgs e) => trackManager.CutSelectedClip();
+
+    //private void menuEditPaste_Click(object sender, EventArgs e)
+    //{
+    //    if (!trackManager.PasteClip(scrubbedXPosition, out string error))
+    //    {
+    //        MessageBox.Show(error, "Paste Failed", MessageBoxButtons.OK, MessageBoxIcon.Information);
+    //    }
+    //}
+
+    //private void menuEditDelete_Click(object sender, EventArgs e) => DeleteSelectedClip(trackManager.SelectedTrack);
+
     private void FrmMain_Load(object sender, EventArgs e)
     {
 

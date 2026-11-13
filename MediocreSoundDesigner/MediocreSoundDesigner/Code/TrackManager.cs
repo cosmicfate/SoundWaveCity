@@ -10,6 +10,8 @@ public class TrackManager
     private Panel panContainer;
     public UndoMan UndoManager { get; } = new();
 
+    private float[] clipboardSamples;
+
   public event Action TracksChanged;
 
   public List<Track> Tracks { get; private set; }
@@ -210,24 +212,6 @@ public class TrackManager
         CombineTracks();
         pseudoCombinedTrack.Play();
     }
-    //private void CombineTracks() {
-    //  pseudoCombinedTrack?.Dispose();
-    //  List<float> combinedSamples = new();
-    //  foreach (Track track in Tracks) {
-    //    if (track.IsDisabled) {
-    //      continue;
-    //    }
-    //    float[] trackSamples = (float[])track.GetAdjustedSamples().Clone();
-    //    for (int i = 0; i < trackSamples.Length; i++) {
-    //      if (combinedSamples.Count <= i) {
-    //        combinedSamples.Add(0);
-    //      }
-    //      combinedSamples[i] += trackSamples[i];
-    //    }
-    //  }
-    //  pseudoCombinedTrack = new(combinedSamples.ToArray());
-    //  pseudoCombinedTrack.LinkPanels(null, panContainer);
-    //}
 
     private void CombineTracks()
     {
@@ -285,4 +269,79 @@ public class TrackManager
         TracksChanged?.Invoke();
     }
 
+    // indicates whether audio data is currently available to paste
+    public bool HasClipboardClip => clipboardSamples is { Length: > 0 };
+
+    // copies the selected clip's samples into the clipboard without modifying the track
+    public bool CopySelectedClip()
+    {
+        if (SelectedTrack?.SelectedClip is null) return false;
+
+        clipboardSamples = (float[])SelectedTrack.SelectedClip.Samples.Clone();
+        return true;
+    }
+
+    // copies the selected clip to the clipboard, snapshots the track for undo, and removes the clip
+    public bool CutSelectedClip()
+    {
+        if (SelectedTrack?.SelectedClip is null) return false;
+
+        CopySelectedClip();
+        RecordTrackSnapshot(SelectedTrack);
+        SelectedTrack.RemoveSelectedClip();
+        SelectedTrack.PanDrawSamples?.Invalidate();
+        return true;
+    }
+
+    // pastes the clipboard clip onto the selected track at the scrubber X position
+    public bool PasteClip(int panelX, out string errorMessage)
+    {
+        errorMessage = string.Empty;
+
+        if (!HasClipboardClip)
+        {
+            errorMessage = "Clipboard is empty.";
+            return false;
+        }
+
+        if (SelectedTrack is null)
+        {
+            errorMessage = "Select a track before pasting.";
+            return false;
+        }
+
+        // convert the scrubber pixel position to a channel-aligned sample index
+        int channelAlign = Math.Max(1, SelectedTrack.channelCount);
+        int startSample = SelectedTrack.SamplePositionAt(panelX);
+        startSample -= startSample % channelAlign;
+
+        // Create a new independent Clip with its own cloned sample buffer
+        Clip pastedClip = new((float[])clipboardSamples.Clone(), startSample);
+
+        // if the scrubber is still sitting on top of the copied clip, shift placement immediately after it
+        if (!SelectedTrack.CanIPlaceClip(pastedClip, startSample))
+        {
+            Clip overlapping = SelectedTrack.Clips.FirstOrDefault(c =>
+                startSample < c.EndSample && (long)startSample + pastedClip.Samples.Length > c.StartSample);
+
+            if (overlapping is not null)
+            {
+                startSample = overlapping.EndSample;
+                int remainder = startSample % channelAlign;
+                if (remainder != 0) startSample += channelAlign - remainder;
+            }
+
+            if (!SelectedTrack.CanIPlaceClip(pastedClip, startSample))
+            {
+                errorMessage = "Not enough empty space on the selected track to paste the clip.";
+                return false;
+            }
+        }
+
+        // undo code to paste the clip onto the selected track, and record the track's state before the paste
+        RecordTrackSnapshot(SelectedTrack);
+        SelectedTrack.AttachClip(pastedClip, startSample);
+        SelectedTrack.PanDrawSamples?.Invalidate();
+        return true;
+    }
 }
