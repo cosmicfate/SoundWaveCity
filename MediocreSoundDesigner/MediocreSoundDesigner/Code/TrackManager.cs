@@ -79,11 +79,11 @@ public class TrackManager {
             }
         }
 
-        if(source.SampleRate <= 0 || target.SampleRate <= 0 || source.SampleRate != target.SampleRate || source.channelCount != target.channelCount)
-        {
-            errorMessage = "Invalid sample rate or channel count for source or target track.";
-            return false;
-        }
+        //if(source.SampleRate <= 0 || target.SampleRate <= 0 || source.SampleRate != target.SampleRate || source.channelCount != target.channelCount)
+        //{
+            //errorMessage = "Invalid sample rate or channel count for source or target track.";
+           // return false;
+       // }
 
         return true; // :)
     }
