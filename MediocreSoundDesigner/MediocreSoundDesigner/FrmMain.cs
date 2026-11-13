@@ -14,10 +14,10 @@ public partial class FrmMain : Form
     {
         InitializeComponent();
         Setup();
+        InitializeTrackInfoUI();
         InitializeTimelineZoom();
         InitializeClipContextMenu();
         AddAppearanceMenu();
-        AddQuickAccessToolbar();
         SizeChanged += FrmMain_SizeChanged;
     }
 
@@ -45,6 +45,7 @@ public partial class FrmMain : Form
         panTracks.BackColor = Settings.Color.TrackBg_Unselected;
         lblPlayhead.BackColor = Settings.Color.Playline;
         trackManager.ApplySettings();
+        RefreshTrackHeaderColors();
     }
 
     // let users revisit the same choices without resetting their setup
@@ -179,6 +180,7 @@ public partial class FrmMain : Form
     private void FrmMain_SizeChanged(object sender, EventArgs e)
     {
         UpdateSizes();
+        PositionPlaybackButton();
     }
 
     // start playback at the chosen scrubber position or pause current playback.
@@ -200,28 +202,54 @@ public partial class FrmMain : Form
     private void menuFileOpen_Click(object sender, EventArgs e)
     {
         ofdLoadFile.DefaultExt = "wav";
-        if (ofdLoadFile.ShowDialog() == DialogResult.OK)
+        if (ofdLoadFile.ShowDialog() != DialogResult.OK) return;
+
+        // load the clip before making a row, so a failed read adds nothing.
+        var clip = Track.LoadClip(ofdLoadFile.FileName);
+
+        // find the first empty track, starting from the top of the list.
+        Track target = trackManager.Tracks.Find(t => t.Clips.Count == 0);
+        bool createdNewTrack = target is null;
+
+        // only create a new row when every existing track already contains audio.
+        if (createdNewTrack)
         {
-            // the file becomes a clip. it goes on the first track that has no clips,
-            // and a new track is only made when every existing track already holds audio.
-            var clip = Track.LoadClip(ofdLoadFile.FileName);
-            Track target = trackManager.Tracks.Find(t => t.Clips.Count == 0);
-            if (target is null)
-            {
-                target = new();
-                CreateTrackPanel(target);
-                trackManager.AddTrack(target);
-                UpdateSizes();
-            }
-            else
-            {
-                trackManager.RecordTrackSnapshot(target); // so undo takes the clip back off the track
-                trackManager.SelectTrack(target);
-            }
-            target.AttachClip(clip, 0); // the clip always starts at the beginning of its track
-            target.PanDrawSamples.Invalidate();
+            target = new Track();
+            CreateTrackPanel(target);
+            trackManager.AddTrack(target);
         }
+        else
+        {
+            // keep the previous empty-track state available to undo.
+            trackManager.RecordTrackSnapshot(target);
+        }
+
+        // attach the imported clip at the beginning of the chosen track.
+        if (!target.AttachClip(clip, 0))
+        {
+            // discard only a row created by this import; keep preexisting rows.
+            if (createdNewTrack)
+            {
+                panTracks.Controls.Remove(target.PanDrawSamples);
+                target.PanDrawSamples.Dispose();
+                trackManager.RemTrack(target);
+                target.Dispose();
+            }
+
+            UpdateSizes();
+            MessageBox.Show("The selected audio could not be added to this track.",
+                "Import failed", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        // name the filled track after the imported file and show its waveform.
+        SetTrackHeaderName(target, Path.GetFileNameWithoutExtension(ofdLoadFile.FileName));
+        trackManager.SelectTrack(target);
+        UpdateSizes();
+        ShowTrackRow(target);
+        target.PanDrawSamples.Invalidate();
     }
+
     // export the current audio mix through the track manager.
     private void menuFileSave_Click(object sender, EventArgs e)
     {
@@ -244,6 +272,7 @@ public partial class FrmMain : Form
             }
         }
     }
+
     // open the existing color settings dialog and refresh its changes.
     private void menuFileSettings_Click(object sender, EventArgs e)
     {
@@ -276,6 +305,7 @@ public partial class FrmMain : Form
             FrmEditVolume frm = new();
             frm.SetSound(trackManager.SelectedTrack);
             frm.ShowDialog();
+            RefreshTrackHeaderColors();
         }
     }
     // open silence removal controls for the selected track.
@@ -321,6 +351,7 @@ public partial class FrmMain : Form
         if (frm.ShowDialog() == DialogResult.Cancel)
         {
             trackManager.RemTrack(newTrack);
+            UpdateSizes();
         }
     }
     // generate a track containing randomized white-noise samples.
@@ -388,7 +419,7 @@ public partial class FrmMain : Form
                 if (isPlaying)
                 {
                     int pos = trackManager.GetPlayheadPos();
-                    lblPlayhead.Left = pos;
+                    lblPlayhead.Left = TrackHeaderWidth + pos;
                     if (trkScrubber != null && pos >= trkScrubber.Minimum && pos <= trkScrubber.Maximum)
                     {
                         trkScrubber.Value = pos;
@@ -396,7 +427,7 @@ public partial class FrmMain : Form
                 }
                 else
                 {
-                    lblPlayhead.Left = scrubbedXPosition;
+                    lblPlayhead.Left = TrackHeaderWidth + scrubbedXPosition;
                     if (trkScrubber != null && scrubbedXPosition >= trkScrubber.Minimum && scrubbedXPosition <= trkScrubber.Maximum)
                     {
                         trkScrubber.Value = scrubbedXPosition;
@@ -469,15 +500,25 @@ public partial class FrmMain : Form
         {
             track.ToggleDisabled();
             track.PanDrawSamples.Invalidate();
+            RefreshTrackHeaderColors();
         };
         // delegate waveform rendering to the track object.
         pan.Paint += (sender, e) =>
         {
             track.DrawSamples(e.Graphics, trackManager.DrawTimescale);
+
+            // mark empty tracks so they are visible before audio is imported.
+            if (track.Clips.Count == 0)
+            {
+                using var hint = new SolidBrush(Settings.Color.TrackSamples_Disabled);
+                e.Graphics.DrawString("empty track - drag a clip here",
+                    Font, hint, 12, 12);
+            }
         };
         EnableClipDragDrop(track, pan);
         panTracks.Controls.Add(pan);
         track.LinkPanels(pan, panTracks);
+        RegisterTrackHeader(track, pan);
         trackManager.SelectTrack(track);
 
         return pan;
@@ -487,32 +528,95 @@ public partial class FrmMain : Form
     private void UpdateSizes()
     {
         const int PADDING = 15;
+        const int ROW_HEIGHT = 150;
+        const int MIN_ROW_HEIGHT = 120;
+        const int MAX_ROW_HEIGHT = 300;
 
-        panTracks.Left = PADDING;
-        panTracks.Width = ClientSize.Width - (PADDING * 2);
+        if (trackManager is null) return;
 
-        if (trkScrubber != null)
+        // remember the current scroll before resetting control positions.
+        int savedScrollY = Math.Max(0, -panTracks.AutoScrollPosition.Y);
+        int rowHeight = MIN_ROW_HEIGHT;
+        panTracks.SuspendLayout();
+        try
         {
-            trkScrubber.Left = panTracks.Left;
-            trkScrubber.Width = panTracks.Width;
-            trkScrubber.Maximum = panTracks.Width;
-        }
+            panTracks.Left = PADDING;
+            panTracks.Width = Math.Max(1, ClientSize.Width - PADDING * 2);
 
-        int top = 0;
-        foreach (Track track in trackManager.Tracks)
-        {
-            track.PanDrawSamples.Left = 0;
-            track.PanDrawSamples.Width = panTracks.Width;
-            track.PanDrawSamples.Height = (panTracks.Height / trackManager.Tracks.Count) - 1;
-            track.PanDrawSamples.Top = top;
-            track.PanDrawSamples.Invalidate();
-            top += track.PanDrawSamples.Height;
+            // work from the unscrolled origin to prevent offsets accumulating.
+            panTracks.AutoScrollPosition = Point.Empty;
+
+            int count = trackManager.Tracks.Count;
+
+            // expand rows to use free space, but keep them readable and scrollable.
+            rowHeight = count == 0 ? MIN_ROW_HEIGHT
+                : Math.Clamp(panTracks.ClientSize.Height / count,
+                    MIN_ROW_HEIGHT, MAX_ROW_HEIGHT);
+            int contentHeight = count * rowHeight;
+            panTracks.AutoScrollMinSize = new Size(0, contentHeight);
+
+            // allow room for the left header and a vertical scrollbar.
+            int waveformWidth = Math.Max(1,
+                panTracks.ClientSize.Width - TrackHeaderWidth
+                - SystemInformation.VerticalScrollBarWidth - 4);
+
+            for (int i = 0; i < count; i++)
+            {
+                Track track = trackManager.Tracks[i];
+
+                // use the track index for vertical placement, never its old top.
+                track.PanDrawSamples.Bounds = new Rectangle(
+                    TrackHeaderWidth, i * rowHeight,
+                    waveformWidth, rowHeight - 1);
+                track.PanDrawSamples.Invalidate();
+            }
+
+            // align each track header with the newly positioned waveform.
+            LayoutTrackHeaders();
+
+            if (trkScrubber is not null)
+            {
+                trkScrubber.Left = panTracks.Left + TrackHeaderWidth;
+                trkScrubber.Width = waveformWidth;
+                trkScrubber.Maximum = waveformWidth;
+                if (trkScrubber.Value > waveformWidth)
+                    trkScrubber.Value = waveformWidth;
+            }
+
+            trkDrawTimescale.Left = panTracks.Left + TrackHeaderWidth;
+            trkDrawTimescale.Width = waveformWidth;
+            lblPlayhead.Left = TrackHeaderWidth + scrubbedXPosition;
+            lblPlayhead.Top = 0;
+            lblPlayhead.Height = Math.Max(panTracks.ClientSize.Height, contentHeight);
+            lblPlayhead.BringToFront();
+
+            PositionPlaybackButton();
         }
-        trkDrawTimescale.Width = panTracks.Width;
-        trkDrawTimescale.Left = PADDING;
-        lblPlayhead.Left = 0;
-        lblPlayhead.Height = panTracks.Height;
-        lblPlayhead.BringToFront();
+        finally
+        {
+            panTracks.ResumeLayout(true);
+
+            // restore scrolling only after every track has a stable position.
+            int maxScrollY = Math.Max(0,
+                trackManager.Tracks.Count * rowHeight - panTracks.ClientSize.Height);
+            panTracks.AutoScrollPosition = new Point(
+                0, Math.Min(savedScrollY, maxScrollY));
+        }
+    }
+
+    // center playback in the footer when the editor is resized or maximized.
+    private void PositionPlaybackButton()
+    {
+        if (btnPlay is null || panTracks is null) return;
+
+        int footerTop = panTracks.Bottom;
+        int footerHeight = Math.Max(0, ClientSize.Height - footerTop);
+
+        btnPlay.Left = Math.Max(0, (ClientSize.Width - btnPlay.Width) / 2);
+        btnPlay.Top = footerHeight >= btnPlay.Height + 8
+            ? footerTop + (footerHeight - btnPlay.Height) / 2
+            : Math.Max(menu.Bottom, ClientSize.Height - btnPlay.Height - 8);
+        btnPlay.BringToFront();
     }
 
     // the scrubber lets users select a horizontal playback starting position.
@@ -527,11 +631,11 @@ public partial class FrmMain : Form
     {
         trkScrubber = new TrackBar
         {
-            Left = panTracks.Left,
+            Left = panTracks.Left + TrackHeaderWidth,
             Top = Math.Max(0, panTracks.Top - 28),
-            Width = panTracks.Width,
+            Width = Math.Max(1, panTracks.Width - TrackHeaderWidth),
             Minimum = 0,
-            Maximum = panTracks.Width,
+            Maximum = Math.Max(1, panTracks.Width - TrackHeaderWidth),
             TickStyle = TickStyle.None,
             Height = 25
         };
@@ -554,7 +658,7 @@ public partial class FrmMain : Form
     private void trkScrubber_Scroll(object sender, EventArgs e)
     {
         scrubbedXPosition = trkScrubber.Value;
-        lblPlayhead.Left = scrubbedXPosition;
+        lblPlayhead.Left = TrackHeaderWidth + scrubbedXPosition;
     }
 
     // finish the seek and restart playback from the new position if needed.
