@@ -1,15 +1,15 @@
 ﻿using MediocreSoundDesigner.Code;
 using NAudio.Wave;
-using System.Configuration;
 using System.Drawing.Drawing2D;
 
 namespace MediocreSoundDesigner;
 
-public enum SampleRegion {
-  BEGINNING_ONLY,
-  END_ONLY,
-  BEGINNING_AND_END,
-  ANYWHERE,
+public enum SampleRegion
+{
+    BEGINNING_ONLY,
+    END_ONLY,
+    BEGINNING_AND_END,
+    ANYWHERE,
 }
 
 public class Track : IDisposable
@@ -285,13 +285,13 @@ public class Track : IDisposable
 
         if (clip is null || clip.Samples.Length == 0 || startSample < 0) return false;
         if (startSample % channelCount != 0 || clip.Samples.Length % channelCount != 0) return false; // clip must be aligned to channel boundaries
-        if(endSample > int.MaxValue) return false; // clip must fit within int range
+        if (endSample > int.MaxValue) return false; // clip must fit within int range
 
         // check for overlap with existing clips
         foreach (Clip c in clips)
         {
             if (c == clip) continue; // skip the clip being moved
-            if(ReferenceEquals(c, ignoredClip)) continue; // skip the clip being ignored
+            if (ReferenceEquals(c, ignoredClip)) continue; // skip the clip being ignored
             if (startSample < c.EndSample && endSample > c.StartSample)
             {
                 return false; // overlap detected
@@ -303,14 +303,14 @@ public class Track : IDisposable
     // checks if a clip can be moved from one track to another at a specified start sample position
     internal bool RepositionClip(Clip clip, int newStartSample)
     {
-       if(!clips.Contains(clip) || !CanIPlaceClip(clip, newStartSample, clip)) return false; // clip not found or cannot be placed at the new position
-       clips.Remove(clip);
+        if (!clips.Contains(clip) || !CanIPlaceClip(clip, newStartSample, clip)) return false; // clip not found or cannot be placed at the new position
+        clips.Remove(clip);
         clip.StartSample = newStartSample;
         int insertIndex = clips.FindIndex(c => c.StartSample > newStartSample);
         if (insertIndex == -1) clips.Add(clip); // add to the end if no clip starts after the new position
         else clips.Insert(insertIndex, clip); // insert before the first clip that starts after the new position
         return true;
-    } 
+    }
 
     internal bool detachClip(Clip clip)
     {
@@ -437,8 +437,8 @@ public class Track : IDisposable
         int ts = Math.Max(1, drawTimescale);
 
         int height = PanDrawSamples.Height;
-        int middle = height / 2;            
-        float heightAdj = height / 2;       
+        int middle = height / 2;
+        float heightAdj = height / 2;
 
         using Pen samplePen = new(IsDisabled ? Settings.Color.TrackSamples_Disabled : Settings.Color.TrackSamples_Enabled);
         using Pen edgePen = new(Settings.Color.TrackSamples_Disabled, 2f);
@@ -456,8 +456,8 @@ public class Track : IDisposable
                 for (int s = 0; s < clip.Samples.Length; s += ts)
                 {
                     var sample = (int)(clip.Samples[s] * heightAdj * Volume);
-                    points.Add(new(x, middle));         
-                    points.Add(new(x, middle - sample)); 
+                    points.Add(new(x, middle));
+                    points.Add(new(x, middle - sample));
                     x++;
                 }
                 g.DrawLines(samplePen, points.ToArray());

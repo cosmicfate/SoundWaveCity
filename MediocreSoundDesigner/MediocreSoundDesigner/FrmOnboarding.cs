@@ -1,8 +1,5 @@
-using System;
 using System.ComponentModel;
-using System.Drawing;
 using System.Drawing.Drawing2D;
-using System.Windows.Forms;
 
 namespace MediocreSoundDesigner;
 
@@ -55,12 +52,22 @@ public sealed class FrmOnboarding : Form
     // create the parts of the wizard that remain visible on every page.
     private void BuildShell()
     {
-        var heading = new Label { Text = editingAppearance ? "Appearance settings" : "Getting started", Dock = DockStyle.Top,
-            Height = 39, Padding = new Padding(12, 9, 0, 0), ForeColor = Color.White };
+        var heading = new Label
+        {
+            Text = editingAppearance ? "Appearance settings" : "Getting started",
+            Dock = DockStyle.Top,
+            Height = 39,
+            Padding = new Padding(12, 9, 0, 0),
+            ForeColor = Color.White
+        };
         Controls.Add(heading);
 
-        var footer = new Panel { Dock = DockStyle.Bottom, Height = 53,
-            BackColor = Color.FromArgb(46, 53, 61) };
+        var footer = new Panel
+        {
+            Dock = DockStyle.Bottom,
+            Height = 53,
+            BackColor = Color.FromArgb(46, 53, 61)
+        };
         footer.Paint += (s, e) => e.Graphics.DrawLine(new Pen(border), 0, 0, footer.Width, 0);
         progress = new Label { AutoSize = true, Location = new Point(14, 18), ForeColor = Color.White };
         previous = MakeButton("Back", Color.FromArgb(88, 96, 107), 165);
@@ -104,9 +111,14 @@ public sealed class FrmOnboarding : Form
     // use a shared button style for consistent footer navigation.
     private Button MakeButton(string title, Color fill, int width) => new()
     {
-        Text = title, Width = width, Height = 36, BackColor = fill,
-        ForeColor = Color.White, FlatStyle = FlatStyle.Flat,
-        Cursor = Cursors.Hand, Font = new Font("Segoe UI", 10)
+        Text = title,
+        Width = width,
+        Height = 36,
+        BackColor = fill,
+        ForeColor = Color.White,
+        FlatStyle = FlatStyle.Flat,
+        Cursor = Cursors.Hand,
+        Font = new Font("Segoe UI", 10)
     };
 
     // rebuild only the current page while keeping the same wizard window.
@@ -127,10 +139,22 @@ public sealed class FrmOnboarding : Form
     {
         AddLabel(content, "Select a theme", new Rectangle(0, 48, 700, 34), 13, true, ContentAlignment.MiddleCenter);
 
-        var light = new RadioButton { Text = "Light", Location = new Point(227, 205),
-            Width = 112, Checked = !prefs.DarkTheme, ForeColor = Color.White };
-        var dark = new RadioButton { Text = "Dark", Location = new Point(369, 205),
-            Width = 112, Checked = prefs.DarkTheme, ForeColor = Color.White };
+        var light = new RadioButton
+        {
+            Text = "Light",
+            Location = new Point(227, 205),
+            Width = 112,
+            Checked = !prefs.DarkTheme,
+            ForeColor = Color.White
+        };
+        var dark = new RadioButton
+        {
+            Text = "Dark",
+            Location = new Point(369, 205),
+            Width = 112,
+            Checked = prefs.DarkTheme,
+            ForeColor = Color.White
+        };
         // update the in-memory selection as soon as a radio option changes.
         light.CheckedChanged += (_, _) => { if (light.Checked) prefs.DarkTheme = false; };
         dark.CheckedChanged += (_, _) => { if (dark.Checked) prefs.DarkTheme = true; };
@@ -144,10 +168,22 @@ public sealed class FrmOnboarding : Form
         content.Controls.Add(lp);
         content.Controls.Add(dp);
 
-        var follow = new CheckBox { Text = "Follow system theme", Checked = prefs.FollowSystemTheme,
-            AutoSize = true, Location = new Point(265, 260), ForeColor = Color.White };
-        var contrast = new CheckBox { Text = "Enable high-contrast", Checked = prefs.HighContrast,
-            AutoSize = true, Location = new Point(265, 307), ForeColor = Color.White };
+        var follow = new CheckBox
+        {
+            Text = "Follow system theme",
+            Checked = prefs.FollowSystemTheme,
+            AutoSize = true,
+            Location = new Point(265, 260),
+            ForeColor = Color.White
+        };
+        var contrast = new CheckBox
+        {
+            Text = "Enable high-contrast",
+            Checked = prefs.HighContrast,
+            AutoSize = true,
+            Location = new Point(265, 307),
+            ForeColor = Color.White
+        };
         // disable manual theme selection while the windows theme is being followed.
         follow.CheckedChanged += (_, _) =>
         {
@@ -166,7 +202,9 @@ public sealed class FrmOnboarding : Form
             Color swatch = accents[i];
             var circle = new ColorSwatch(swatch, prefs.AccentColor.ToArgb() == swatch.ToArgb())
             {
-                Location = new Point(226 + i * 37, 392), Size = new Size(30, 30), Cursor = Cursors.Hand
+                Location = new Point(226 + i * 37, 392),
+                Size = new Size(30, 30),
+                Cursor = Cursors.Hand
             };
             // update the stored color and selection outline without leaving the page.
             circle.Click += (_, _) =>
@@ -210,14 +248,32 @@ public sealed class FrmOnboarding : Form
     // build a reusable selectable option with a title, description, and visual indicator.
     private Panel CreateChoice(Panel parent, string name, string detail, int top, bool selected)
     {
-        var box = new Panel { Location = new Point(30, top), Size = new Size(290, 75),
-            BackColor = bg, Cursor = Cursors.Hand };
+        var box = new Panel
+        {
+            Location = new Point(30, top),
+            Size = new Size(290, 75),
+            BackColor = bg,
+            Cursor = Cursors.Hand
+        };
         box.Paint += (_, e) => ControlPaint.DrawBorder(e.Graphics, box.ClientRectangle,
             (box.Tag is bool b && b) ? prefs.AccentColor : border, ButtonBorderStyle.Solid);
-        var radio = new Label { Name = "radio", Text = selected ? "◉" : "◯", Location = new Point(14, 22),
-            AutoSize = true, Font = new Font("Segoe UI", 19), ForeColor = selected ? prefs.AccentColor : muted };
-        var title = new Label { Text = name, Location = new Point(55, 13), AutoSize = true,
-            ForeColor = Color.White, Font = new Font("Segoe UI", 10, FontStyle.Bold) };
+        var radio = new Label
+        {
+            Name = "radio",
+            Text = selected ? "◉" : "◯",
+            Location = new Point(14, 22),
+            AutoSize = true,
+            Font = new Font("Segoe UI", 19),
+            ForeColor = selected ? prefs.AccentColor : muted
+        };
+        var title = new Label
+        {
+            Text = name,
+            Location = new Point(55, 13),
+            AutoSize = true,
+            ForeColor = Color.White,
+            Font = new Font("Segoe UI", 10, FontStyle.Bold)
+        };
         var sub = new Label { Text = detail, Location = new Point(55, 41), AutoSize = true, ForeColor = Color.White };
         box.Controls.Add(radio); box.Controls.Add(title); box.Controls.Add(sub);
         parent.Controls.Add(box);
@@ -239,9 +295,15 @@ public sealed class FrmOnboarding : Form
     private static Label AddLabel(Control target, string text, Rectangle position, float fontSize,
         bool bold = false, ContentAlignment alignment = ContentAlignment.MiddleLeft)
     {
-        var label = new Label { Text = text, Bounds = position, ForeColor = Color.White,
-            TextAlign = alignment, Font = new Font("Segoe UI", fontSize,
-            bold ? FontStyle.Bold : FontStyle.Regular) };
+        var label = new Label
+        {
+            Text = text,
+            Bounds = position,
+            ForeColor = Color.White,
+            TextAlign = alignment,
+            Font = new Font("Segoe UI", fontSize,
+            bold ? FontStyle.Bold : FontStyle.Regular)
+        };
         target.Controls.Add(label);
         return label;
     }

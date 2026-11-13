@@ -1,7 +1,3 @@
-using System;
-using System.Drawing;
-using System.Windows.Forms;
-
 namespace MediocreSoundDesigner;
 
 
@@ -9,7 +5,7 @@ public partial class FrmMain
 {
     private const int CLIP_MENU_OFFSET_X = 14;
 
-    
+
     private ContextMenuStrip clipMenu = null!;      // shown when a clip is right-clicked
     private ContextMenuStrip trackMenu = null!;     // shown when an empty part of a track is right-clicked
     // the track that the open menu is acting on.

@@ -122,14 +122,14 @@ public partial class FrmMain : Form
     private void DeleteSelectedClip(Track track)
     {
         if (track?.SelectedClip is null) return;
-            track.RemoveSelectedClip();
-            track.PanDrawSamples.Invalidate();
-            // the track goes too if that was its last clip and other tracks exist.
-            // (a track emptied by dragging its clip away is left alone, so this only checks this track)
-            if (trackManager.RemoveTrackIfEmpty(track))
-            {
-                UpdateSizes();
-            }
+        track.RemoveSelectedClip();
+        track.PanDrawSamples.Invalidate();
+        // the track goes too if that was its last clip and other tracks exist.
+        // (a track emptied by dragging its clip away is left alone, so this only checks this track)
+        if (trackManager.RemoveTrackIfEmpty(track))
+        {
+            UpdateSizes();
+        }
     }
 
     // asks for confirmation, then deletes the whole track along with every clip on it.

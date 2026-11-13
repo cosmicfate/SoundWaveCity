@@ -1,6 +1,3 @@
-using System;
-using System.Drawing;
-using System.IO;
 using System.Text.Json;
 
 namespace MediocreSoundDesigner;
