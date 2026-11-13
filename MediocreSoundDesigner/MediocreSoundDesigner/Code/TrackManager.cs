@@ -70,6 +70,21 @@ public class TrackManager {
             return false;
         }
 
+        if(ReferenceEquals(source, target))
+        {
+            if(!target.CanIPlaceClip(clip, startSample, clip))
+            {
+                errorMessage = "The clip would overlap another clip or fall outside the track.";
+                return false;
+            }
+        }
+
+        if(source.SampleRate <= 0 || target.SampleRate <= 0 || source.SampleRate != target.SampleRate || source.channelCount != target.channelCount)
+        {
+            errorMessage = "Invalid sample rate or channel count for source or target track.";
+            return false;
+        }
+
         return true; // :)
     }
 
@@ -93,9 +108,17 @@ public class TrackManager {
             return false;
         }
 
-        SelectTrack(target); // select the target track after moving the clip
+        if(ReferenceEquals(source, target))
+        {
+            if (!source.RepositionClip(clip, startSample))
+            {
+                errorMessage = "Failed to reposition the clip within the same track.";
+                return false;
+            }
+        }
+
+        SelectTrack(source); // select the source track after moving the clip
         source.PanDrawSamples?.Invalidate(); // redraw the source track
-        target.PanDrawSamples?.Invalidate(); // redraw the target track
         return true; // :)
     }
 

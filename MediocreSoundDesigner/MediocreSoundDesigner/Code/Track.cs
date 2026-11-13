@@ -60,32 +60,31 @@ public class Track : IDisposable
     public PlaybackState State => outputDevice?.PlaybackState ?? PlaybackState.Stopped;
 
     // ctor
+
     public Track(string file)
     {
-        fileReader = new AudioFileReader(file);
-        int sampleCount = (int)(fileReader.Length / 4);
-        // samples is read into local array now because now 'samples' needs a SelectedClip that doesn't exist yet
-        float[] fileSamples = new float[sampleCount];
-        int samplesRead = ((ISampleProvider)fileReader).Read(fileSamples);
-        if (samplesRead < sampleCount)
-        {
-            Array.Resize(ref fileSamples, samplesRead);
-        }
-        // whole file becomes one clip that starts at pos 0 and is selected
+        float[] fileSamples = AudioImport.Load(file);
+
+        // create the initial clip from the converted samples
         clips.Add(new Clip(fileSamples, 0));
         SelectedClip = clips[0];
+
         this.file = file;
-        this.duration = fileReader.TotalTime;
+        this.duration = TimeSpan.FromSeconds(
+            fileSamples.Length / (double)AudioImport.SampleRate);
+
         this.offset = 0;
         this.timeScale = 1.0f;
         this.Volume = 1.0f;
         this.pitch = 1.0f;
-        this.bits = fileReader.WaveFormat.BitsPerSample;
-        this.channels = fileReader.WaveFormat.Channels;
-        this.sampleRate = fileReader.WaveFormat.SampleRate;
+        this.bits = 32;
+        this.channels = 1;
+        this.sampleRate = AudioImport.SampleRate;
+
         IsDisabled = false;
     }
-    public Track(float[] samples)
+
+    public Track(float[] samples, int sampleRate = 44100, int channels = 1)
     {
         clips.Add(new Clip(samples, 0));
         SelectedClip = clips[0];
@@ -97,8 +96,8 @@ public class Track : IDisposable
         this.Volume = 1.0f;
         this.pitch = 1.0f;
         this.bits = 32;
-        this.channels = 1;
-        this.sampleRate = 0;
+        this.channels = channels;
+        this.sampleRate = AudioImport.SampleRate;
         IsDisabled = false;
     }
     public void LinkPanels(Panel panDrawSamples, Panel panContainer)
@@ -278,7 +277,7 @@ public class Track : IDisposable
         return (int)Math.Min(int.MaxValue, position); // clamp to int range)
     }
 
-    public bool CanIPlaceClip(Clip clip, int startSample)
+    public bool CanIPlaceClip(Clip clip, int startSample, Clip ignoredClip = null)
     {
         int channelCount = Math.Max(1, channels);
         long endSample = (long)startSample + clip.Samples.Length;
@@ -291,6 +290,7 @@ public class Track : IDisposable
         foreach (Clip c in clips)
         {
             if (c == clip) continue; // skip the clip being moved
+            if(ReferenceEquals(c, ignoredClip)) continue; // skip the clip being ignored
             if (startSample < c.EndSample && endSample > c.StartSample)
             {
                 return false; // overlap detected
@@ -298,6 +298,18 @@ public class Track : IDisposable
         }
         return true;
     }
+
+    // checks if a clip can be moved from one track to another at a specified start sample position
+    internal bool RepositionClip(Clip clip, int newStartSample)
+    {
+       if(!clips.Contains(clip) || !CanIPlaceClip(clip, newStartSample, clip)) return false; // clip not found or cannot be placed at the new position
+       clips.Remove(clip);
+        clip.StartSample = newStartSample;
+        int insertIndex = clips.FindIndex(c => c.StartSample > newStartSample);
+        if (insertIndex == -1) clips.Add(clip); // add to the end if no clip starts after the new position
+        else clips.Insert(insertIndex, clip); // insert before the first clip that starts after the new position
+        return true;
+    } 
 
     internal bool detachClip(Clip clip)
     {
@@ -370,7 +382,11 @@ public class Track : IDisposable
     public void SaveToFile(string path)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path));
-        using var writer = new WaveFileWriter(path, fileReader?.WaveFormat ?? new());
+        // write samples using the normalized internal audio format
+        WaveFormat format = WaveFormat.CreateIeeeFloatWaveFormat(
+            sampleRate, channels);
+
+        using var writer = new WaveFileWriter(path, format);
         // since 'samples' now only references the selectedClip, using output's length writes everything
         float[] output = GetAdjustedSamples();
         writer.WriteSamples(output, 0, output.Length);
