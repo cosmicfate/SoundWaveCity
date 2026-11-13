@@ -3,6 +3,8 @@ using MediocreSoundDesigner.Code;
 
 namespace MediocreSoundDesigner; 
 
+public UndoMan UndoMan { get; private set; } = new();
+
 public class TrackManager {
   private Track pseudoCombinedTrack;
   private Panel panContainer;

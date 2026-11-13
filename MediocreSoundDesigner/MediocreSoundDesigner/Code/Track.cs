@@ -544,4 +544,15 @@ public class Track : IDisposable
     }
 
 
+    // undo function to restore the track to a previous state
+    public void RestoreSnapshot(List<Clip> savedClips, int selectedClipIndex, float volume, bool isDisabled)
+    {
+        clips.Clear();
+        clips.AddRange(savedClips);
+        SelectedClip = (selectedClipIndex >= 0 && selectedClipIndex < clips.Count) ? clips[selectedClipIndex] : null;
+        Volume = volume;
+        IsDisabled = isDisabled;
+    }
+
+
 }

@@ -1,0 +1,4 @@
+interface IUndoableAction
+{
+    void Undo();
+}
