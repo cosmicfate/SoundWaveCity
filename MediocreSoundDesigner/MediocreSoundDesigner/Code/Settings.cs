@@ -18,6 +18,7 @@ public static class Settings {
     public Color TrackBg_Unselected { get; set; }
     public Color TrackBg_Selected { get; set; }
     public Color Playline { get; set; }
+    public Color ClipSelectionOutline => ControlPaint.Dark(TrackSamples_Enabled, .15f);
 
     public Colors() {
       WinBg = System.Drawing.Color.Black;

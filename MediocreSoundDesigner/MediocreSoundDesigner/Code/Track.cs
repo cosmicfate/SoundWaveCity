@@ -1,5 +1,6 @@
 ﻿using MediocreSoundDesigner.Code;
 using NAudio.Wave;
+using System.Configuration;
 using System.Drawing.Drawing2D;
 
 namespace MediocreSoundDesigner;
@@ -54,35 +55,33 @@ public class Track : IDisposable
     public bool IsDisabled { get; private set; }
     public Panel PanDrawSamples { get; private set; }
     public float Volume { get; private set; }
+    public int SampleRate => sampleRate;
+    public int channelCount => channels;
     private string tempFilePath => Path.Combine(Path.GetTempPath(), "MediocreSoundDesigner", "temp.wav");
     public PlaybackState State => outputDevice?.PlaybackState ?? PlaybackState.Stopped;
 
     // ctor
-    public Track(string file)
+
+    // creates an empty track (no clips). imported files are loaded with LoadClip
+    // and placed on a track with AttachClip, so the audio is a clip ON the track, not the track itself.
+    public Track()
     {
-        fileReader = new AudioFileReader(file);
-        int sampleCount = (int)(fileReader.Length / 4);
-        // samples is read into local array now because now 'samples' needs a SelectedClip that doesn't exist yet
-        float[] fileSamples = new float[sampleCount];
-        int samplesRead = ((ISampleProvider)fileReader).Read(fileSamples);
-        if (samplesRead < sampleCount)
-        {
-            Array.Resize(ref fileSamples, samplesRead);
-        }
-        // whole file becomes one clip that starts at pos 0 and is selected
-        clips.Add(new Clip(fileSamples, 0));
-        SelectedClip = clips[0];
-        this.file = file;
-        this.duration = fileReader.TotalTime;
+        this.file = "";
+        this.duration = TimeSpan.Zero;
         this.offset = 0;
         this.timeScale = 1.0f;
         this.Volume = 1.0f;
         this.pitch = 1.0f;
-        this.bits = fileReader.WaveFormat.BitsPerSample;
-        this.channels = fileReader.WaveFormat.Channels;
-        this.sampleRate = fileReader.WaveFormat.SampleRate;
+        this.bits = 32;
+        this.channels = 1;
+        this.sampleRate = AudioImport.SampleRate;
         IsDisabled = false;
     }
+
+    // reads a whole audio file into a clip that isn't on any track yet.
+    // AudioImport converts every file to mono at AudioImport.SampleRate, so the clip fits on any track.
+    public static Clip LoadClip(string file) => new(AudioImport.Load(file), 0);
+
     public Track(float[] samples)
     {
         clips.Add(new Clip(samples, 0));
@@ -96,7 +95,7 @@ public class Track : IDisposable
         this.pitch = 1.0f;
         this.bits = 32;
         this.channels = 1;
-        this.sampleRate = 0;
+        this.sampleRate = AudioImport.SampleRate;
         IsDisabled = false;
     }
     public void LinkPanels(Panel panDrawSamples, Panel panContainer)
@@ -231,6 +230,9 @@ public class Track : IDisposable
     }
 
     // selects clip under the given panel X position. if there is no clip then selctedClip becomes null
+
+    public void DeselectClip() => SelectedClip = null;  // method to deselect currently selected clip, called when user selects empty space or a different clip
+
     public bool SelectClipAt(int panelX)
     {
         // ClipAt returns null for an empty spot, so this deselects in that case
@@ -266,6 +268,65 @@ public class Track : IDisposable
 
         // for convenience to the user, the right half gets selected for easy movement/edit (right arrow)
         SelectedClip = right;
+        return true;
+    }
+
+    // convert the horizontal panel position to a sample position in the track's timeline. 
+    public int SamplePositionAt(int panelX)
+    {
+        long position = (long)Math.Max(0, panelX) * Math.Max(1, drawTimescale); // convert to sample position
+        return (int)Math.Min(int.MaxValue, position); // clamp to int range)
+    }
+
+    public bool CanIPlaceClip(Clip clip, int startSample, Clip ignoredClip = null)
+    {
+        int channelCount = Math.Max(1, channels);
+        long endSample = (long)startSample + clip.Samples.Length;
+
+        if (clip is null || clip.Samples.Length == 0 || startSample < 0) return false;
+        if (startSample % channelCount != 0 || clip.Samples.Length % channelCount != 0) return false; // clip must be aligned to channel boundaries
+        if(endSample > int.MaxValue) return false; // clip must fit within int range
+
+        // check for overlap with existing clips
+        foreach (Clip c in clips)
+        {
+            if (c == clip) continue; // skip the clip being moved
+            if(ReferenceEquals(c, ignoredClip)) continue; // skip the clip being ignored
+            if (startSample < c.EndSample && endSample > c.StartSample)
+            {
+                return false; // overlap detected
+            }
+        }
+        return true;
+    }
+
+    // checks if a clip can be moved from one track to another at a specified start sample position
+    internal bool RepositionClip(Clip clip, int newStartSample)
+    {
+       if(!clips.Contains(clip) || !CanIPlaceClip(clip, newStartSample, clip)) return false; // clip not found or cannot be placed at the new position
+       clips.Remove(clip);
+        clip.StartSample = newStartSample;
+        int insertIndex = clips.FindIndex(c => c.StartSample > newStartSample);
+        if (insertIndex == -1) clips.Add(clip); // add to the end if no clip starts after the new position
+        else clips.Insert(insertIndex, clip); // insert before the first clip that starts after the new position
+        return true;
+    } 
+
+    internal bool detachClip(Clip clip)
+    {
+        if (clip is null || !clips.Remove(clip)) return false; // clip is null or not found in the list
+        if (ReferenceEquals(SelectedClip, clip)) SelectedClip = null; // deselect if the removed clip was selected
+        return true;
+    }
+
+    internal bool AttachClip(Clip clip, int startSample)
+    {
+        if (clip is null || !CanIPlaceClip(clip, startSample)) return false; // clip is null or cannot be placed at the specified position
+        clip.StartSample = startSample; // actually move the clip to the position that was just checked
+        int insertIndex = clips.FindIndex(c => c.StartSample > startSample);
+        if (insertIndex == -1) clips.Add(clip); // add to the end if no clip starts after the specified position
+        else clips.Insert(insertIndex, clip); // insert before the first clip that starts after the specified position
+        SelectedClip = clip; // select the newly attached clip
         return true;
     }
 
@@ -315,7 +376,9 @@ public class Track : IDisposable
     private void SaveToTempFile()
     {
         Directory.CreateDirectory(Path.GetDirectoryName(tempFilePath));
-        using var writer = new WaveFileWriter(tempFilePath, fileReader?.WaveFormat ?? new());
+        // the samples are mono floats at sampleRate, so the file has to be described that way.
+        WaveFormat format = WaveFormat.CreateIeeeFloatWaveFormat(sampleRate, channels);
+        using var writer = new WaveFileWriter(tempFilePath, format);
         // since 'samples' now only references the selectedClip, using output's length writes everything
         float[] output = GetAdjustedSamples();
         writer.WriteSamples(output, 0, output.Length);
@@ -323,13 +386,18 @@ public class Track : IDisposable
     public void SaveToFile(string path)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path));
-        using var writer = new WaveFileWriter(path, fileReader?.WaveFormat ?? new());
+        // write samples using the normalized internal audio format
+        WaveFormat format = WaveFormat.CreateIeeeFloatWaveFormat(
+            sampleRate, channels);
+
+        using var writer = new WaveFileWriter(path, format);
         // since 'samples' now only references the selectedClip, using output's length writes everything
         float[] output = GetAdjustedSamples();
         writer.WriteSamples(output, 0, output.Length);
     }
     public float[] GetAdjustedSamples()
     {
+        if (clips.Count == 0) return Array.Empty<float>();
         int length = clips.Max(c => c.EndSample);
         float[] adjusted = new float[length];
 
@@ -373,8 +441,8 @@ public class Track : IDisposable
         float heightAdj = height / 2;       
 
         using Pen samplePen = new(IsDisabled ? Settings.Color.TrackSamples_Disabled : Settings.Color.TrackSamples_Enabled);
-        using Pen edgePen = new(Settings.Color.WinBg);
-        using Pen selectedPen = new(Settings.Color.TrackSamples_Disabled) { DashStyle = DashStyle.Dash };
+        using Pen edgePen = new(Settings.Color.TrackSamples_Disabled, 2f);
+        using Pen selectedPen = new(Settings.Color.ClipSelectionOutline, 2f) { DashStyle = DashStyle.Solid };
 
         foreach (Clip clip in clips)
         {
@@ -395,15 +463,13 @@ public class Track : IDisposable
                 g.DrawLines(samplePen, points.ToArray());
             }
 
-            if (clips.Count > 1)
-            {
-                g.DrawLine(edgePen, startX, 0, startX, height);
-                g.DrawLine(edgePen, endX, 0, endX, height);
+            // edges are drawn even for each clip to distinguish them
+            g.DrawLine(edgePen, startX, 0, startX, height);
+            g.DrawLine(edgePen, endX, 0, endX, height);
 
-                if (clip == SelectedClip)
-                {
-                    g.DrawRectangle(selectedPen, startX, 0, endX - startX, height - 1);
-                }
+            if (clip == SelectedClip)
+            {
+                g.DrawRectangle(selectedPen, startX, 0, endX - startX, height - 1);
             }
         }
     }
@@ -477,6 +543,17 @@ public class Track : IDisposable
     public void SetDrawTimescale(int timescale)
     {
         this.drawTimescale = timescale;
+    }
+
+
+    // undo function to restore the track to a previous state
+    public void RestoreSnapshot(List<Clip> savedClips, int selectedClipIndex, float volume, bool isDisabled)
+    {
+        clips.Clear();
+        clips.AddRange(savedClips);
+        SelectedClip = (selectedClipIndex >= 0 && selectedClipIndex < clips.Count) ? clips[selectedClipIndex] : null;
+        Volume = volume;
+        IsDisabled = isDisabled;
     }
 
 

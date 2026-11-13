@@ -14,7 +14,10 @@ public partial class FrmMain : Form
     {
         InitializeComponent();
         Setup();
+        InitializeTimelineZoom();
+        InitializeClipContextMenu();
         AddAppearanceMenu();
+        AddQuickAccessToolbar();
         SizeChanged += FrmMain_SizeChanged;
     }
 
@@ -68,6 +71,14 @@ public partial class FrmMain : Form
     // provide keyboard shortcuts for nudging or deleting the selected track.
     protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
     {
+        // undo keybind code that when Ctrl+Z is pressed, it calls the UndoLastAction method of the trackManager and updates the sizes of the tracks.
+        if (keyData == (Keys.Control | Keys.Z))
+        {
+            trackManager.UndoLastAction();
+            UpdateSizes();
+            return true;
+        }
+
         Track selectedTrack = trackManager.SelectedTrack;
         if (selectedTrack is not null)
         {
@@ -85,24 +96,15 @@ public partial class FrmMain : Form
             }
             else if (keyData == Keys.Delete)
             {
-                if (selectedTrack.SelectedClip is not null & selectedTrack.Clips.Count != 1)
+                // a selected clip is deleted on its own and the track remains, even if that was its only clip.
+                // with no clip selected, Delete removes the track.
+                if (selectedTrack.SelectedClip is not null)
                 {
-                    if (MessageBox.Show("This will delete the selected CLIP. This is NOT undoable!", "Are You Sure?", MessageBoxButtons.YesNo, MessageBoxIcon.Exclamation) == DialogResult.Yes)
-                    {
-                        selectedTrack.RemoveSelectedClip();
-                        selectedTrack.PanDrawSamples.Invalidate();
-                    }
+                    DeleteSelectedClip(selectedTrack);
                 }
                 else
                 {
-                    if (MessageBox.Show("This will delete the selected TRACK. This is NOT undoable!", "Are You Sure?", MessageBoxButtons.YesNo, MessageBoxIcon.Exclamation) == DialogResult.Yes)
-                    {
-                        panTracks.Controls.Remove(selectedTrack.PanDrawSamples);
-                        selectedTrack.PanDrawSamples.Dispose();
-                        selectedTrack.Dispose();
-                        trackManager.RemTrack(selectedTrack);
-                        UpdateSizes();
-                    }
+                    DeleteTrack(selectedTrack);
                 }
                 return true;
             }
@@ -113,6 +115,30 @@ public partial class FrmMain : Form
             }
         }
         return base.ProcessCmdKey(ref msg, keyData);
+    }
+
+    // asks for confirmation, then deletes the track's selected clip. the track itself remains.
+    // shared by the Delete key and the right-click clip menu.
+    private void DeleteSelectedClip(Track track)
+    {
+        if (track?.SelectedClip is null) return;
+            track.RemoveSelectedClip();
+            track.PanDrawSamples.Invalidate();
+    }
+
+    // asks for confirmation, then deletes the whole track along with every clip on it.
+    // shared by the Delete key and the right-click track menu.
+    private void DeleteTrack(Track track)
+    {
+        if (track is null) return;
+        if (MessageBox.Show("This will delete the selected TRACK. This is NOT undoable!", "Are You Sure?", MessageBoxButtons.YesNo, MessageBoxIcon.Exclamation) == DialogResult.Yes)
+        {
+            panTracks.Controls.Remove(track.PanDrawSamples);
+            track.PanDrawSamples.Dispose();
+            track.Dispose();
+            trackManager.RemTrack(track);
+            UpdateSizes();
+        }
     }
 
     // resize the timeline and track panels when the editor window changes size.
@@ -142,10 +168,13 @@ public partial class FrmMain : Form
         ofdLoadFile.DefaultExt = "wav";
         if (ofdLoadFile.ShowDialog() == DialogResult.OK)
         {
-            Track newTrack = new(ofdLoadFile.FileName);
+            // every imported file gets its own new track, and the file is a clip on that track.
+            var clip = Track.LoadClip(ofdLoadFile.FileName);
+            Track newTrack = new();
             CreateTrackPanel(newTrack);
             trackManager.AddTrack(newTrack);
             UpdateSizes();
+            newTrack.AttachClip(clip, 0); // the clip always starts at the beginning of its new track
             newTrack.PanDrawSamples.Invalidate();
         }
     }
@@ -172,11 +201,13 @@ public partial class FrmMain : Form
     // invert the selected waveform vertically.
     private void menuEditFlip_Click(object sender, EventArgs e)
     {
+        trackManager.RecordTrackSnapshot(trackManager.SelectedTrack);
         trackManager.SelectedTrack?.Flip();
     }
     // reverse the order of samples in the selected track.
     private void menuEditReverse_Click(object sender, EventArgs e)
     {
+        trackManager.RecordTrackSnapshot(trackManager.SelectedTrack);
         trackManager.SelectedTrack?.Reverse();
     }
     // open the volume adjustment dialog for the selected track.
@@ -184,6 +215,7 @@ public partial class FrmMain : Form
     {
         if (trackManager.SelectedTrack is not null)
         {
+            trackManager.RecordTrackSnapshot(trackManager.SelectedTrack);
             FrmEditVolume frm = new();
             frm.SetSound(trackManager.SelectedTrack);
             frm.ShowDialog();
@@ -194,6 +226,7 @@ public partial class FrmMain : Form
     {
         if (trackManager.SelectedTrack is not null)
         {
+            trackManager.RecordTrackSnapshot(trackManager.SelectedTrack);
             FrmEditEliminateSilence frm = new();
             frm.SetSound(trackManager.SelectedTrack);
             frm.ShowDialog();
@@ -206,6 +239,7 @@ public partial class FrmMain : Form
         Track track = trackManager.SelectedTrack;
         if (track is null) return;
 
+        trackManager.RecordTrackSnapshot(trackManager.SelectedTrack);
         // Split the clip under the edit cursor (a pixel X position). Both halves
         // stay on this track, so there are no new panels or rows and UpdateSizes
         // isn't needed. SplitAt returns false if the cursor isn't inside a clip.
@@ -344,6 +378,7 @@ public partial class FrmMain : Form
         // a single click selects the track for keyboard and editing commands.
         pan.Click += (sender, e) =>
         {
+            trackManager.RecordTrackSnapshot(trackManager.SelectedTrack);
             trackManager.SelectTrack(track);
         };
         pan.MouseClick += (sender, e) =>
@@ -365,6 +400,12 @@ public partial class FrmMain : Form
             // selects the clicked clip and then repaints the outline
             track.SelectClipAt(e.X);
             track.PanDrawSamples.Invalidate();
+
+            // right-clicking a clip also opens the clip edit menu (ClipContextMenu)
+            if (e.Button == MouseButtons.Right)
+            {
+                ShowTrackContextMenu(track, pan, e.Location);
+            }
         };
         // double-click to enable or disable the track without removing it.
         pan.DoubleClick += (sender, e) =>
@@ -377,6 +418,7 @@ public partial class FrmMain : Form
         {
             track.DrawSamples(e.Graphics, trackManager.DrawTimescale);
         };
+        EnableClipDragDrop(track, pan);
         panTracks.Controls.Add(pan);
         track.LinkPanels(pan, panTracks);
         trackManager.SelectTrack(track);
@@ -468,5 +510,10 @@ public partial class FrmMain : Form
         {
             trackManager.PlayAllFrom(scrubbedXPosition);
         }
+    }
+
+    private void FrmMain_Load(object sender, EventArgs e)
+    {
+
     }
 }
