@@ -122,11 +122,8 @@ public partial class FrmMain : Form
     private void DeleteSelectedClip(Track track)
     {
         if (track?.SelectedClip is null) return;
-        if (MessageBox.Show("This will delete the selected CLIP. This is NOT undoable!", "Are You Sure?", MessageBoxButtons.YesNo, MessageBoxIcon.Exclamation) == DialogResult.Yes)
-        {
             track.RemoveSelectedClip();
             track.PanDrawSamples.Invalidate();
-        }
     }
 
     // asks for confirmation, then deletes the whole track along with every clip on it.
